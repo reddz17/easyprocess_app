@@ -1,0 +1,11 @@
+CREATE TABLE IF NOT EXISTS user_profiles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    user_id TEXT NOT NULL UNIQUE,
+    registration_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    last_login DATETIME,
+    profile_picture BLOB,  -- Utilisez le type BLOB pour stocker des images
+    cv_pdf BLOB,  -- Utilisez le type BLOB pour stocker des fichiers PDF
+    -- Ajoutez d'autres colonnes en fonction de vos besoins
+);
