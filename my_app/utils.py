@@ -24,7 +24,7 @@ def create_database(conn, cursor):
     conn.close()
 
 # Helper function to add a user
-def add_user(username, email_address, password, is_recruiter, conn, cursor):
+def add_user(username, password, email_address,  is_recruiter, conn, cursor):
     password_hash = pbkdf2_sha256.hash(password)
     cursor.execute('INSERT INTO users (username, password, email_address, is_recruiter) VALUES (?, ?, ?, ?)', (username, password_hash, email_address, is_recruiter))
     conn.commit()

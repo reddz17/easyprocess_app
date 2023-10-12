@@ -34,6 +34,7 @@ elif page == "Login":
         user = cursor.fetchone()
         if user and pbkdf2_sha256.verify(password, user[1]):
             st.success('Login successful!')
+            st.session_state.user = username
             st.write(f'Hello, {username}!')
             if user[2]:
                 st.write('You are a recruiter.')
