@@ -11,7 +11,7 @@ create_database(conn, cursor)
 
 # Navigation bar
 st.sidebar.title("Navigation")
-page = st.sidebar.radio("Go to", ("Home", "Search Jobs", "Login", "Register"))
+page = st.sidebar.radio("Go to", ("Home", "Search Jobs", "Login", "Register", "User Profile"))
 
 if page == "Home":
     st.title("Welcome to Your Recruitment Platform")
@@ -53,3 +53,50 @@ elif page == "Register":
     if st.button('Register', key="register_button"):
         add_user(new_username, new_password, new_email, is_recruiter, conn, cursor)
         st.success('Registration successful! You can now log in.')
+
+
+if 'user' not in st.session_state:
+    st.session_state.user = None
+
+elif page == "User Profile":
+    st.title("User Profile")
+
+    if st.session_state.user:
+        username = st.session_state.user  # Get the currently logged-in user's username
+
+        # Query the database to fetch user data.
+        cursor.execute('SELECT username, email_address FROM users WHERE username = ?', (username,))
+        user_data = cursor.fetchone()
+
+        if user_data:
+            username = user_data[0]
+            email = user_data[1]
+
+            # Display the user's profile information.
+            st.write(f"Username: {username}")
+            st.write(f"Email: {email}")
+
+            # Allow the user to upload a profile picture and a CV.
+            st.header("Edit Profile")
+            uploaded_profile_picture = st.file_uploader("Upload Profile Picture", type=["jpg", "jpeg", "png"])
+            uploaded_cv = st.file_uploader("Upload CV (PDF)", type=["pdf"])
+
+            if st.button("Save Changes"):
+                # Handle profile picture and CV uploads and update the user's data in the database.
+                if uploaded_profile_picture:
+                    # Process and save the profile picture.
+                    pass  # Add your logic here
+
+                if uploaded_cv:
+                    # Process and save the CV.
+                    pass  # Add your logic here
+
+                # Update the user's data in the database (e.g., username and email).
+                # You can use the user_data retrieved from the database to update the user's data.
+                # Replace the following lines with your actual database update logic.
+
+                st.success("Changes saved successfully!")
+        else:
+            st.error("User not found. Please log in.")
+    else:
+        st.error("You are not logged in. Please log in to view your profile.")
