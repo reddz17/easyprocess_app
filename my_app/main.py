@@ -26,12 +26,16 @@ elif page == "Login":
     st.title("User Login")
     # Implement the login form
     username = st.text_input('Username')
+    email = st.text_input('Email')
     password = st.text_input('Password', type='password')
 
     if st.button('Login', key="login_button"):
+        print(f"DEBUG: Entered username: {username}")
+        print(f"DEBUG: Entered email: {email}")
         # Verify user credentials
-        cursor.execute('SELECT id, password, is_recruiter FROM users WHERE username = ?', (username,))
+        cursor.execute('SELECT id, password, is_recruiter FROM users WHERE username = ? AND email_address = ?', (username, email))
         user = cursor.fetchone()
+        print(f"DEBUG: Retrieved user: {user}")  # Check the user retrieved from the database
         if user and pbkdf2_sha256.verify(password, user[1]):
             st.success('Login successful!')
             st.session_state.user = username
