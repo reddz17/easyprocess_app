@@ -30,7 +30,7 @@ with open('query.sql', 'r') as query_file:
                     table = tabulate(table_data, headers="firstrow", tablefmt="pretty")
                     print(table)
                 else:
-                    print("No results found.")
+                    print("Table is empty !")
 
 # Close the database connection
 conn.close()

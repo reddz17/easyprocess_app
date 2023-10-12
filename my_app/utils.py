@@ -3,7 +3,7 @@ from passlib.hash import pbkdf2_sha256
 from datetime import datetime
 
 
-def create_database():
+def create_database(conn, cursor):
     conn = sqlite3.connect('recruitment.db')
     cursor = conn.cursor()
 
@@ -13,6 +13,7 @@ def create_database():
             id INTEGER PRIMARY KEY,
             username TEXT NOT NULL,
             password TEXT NOT NULL,
+            email_address TEXT NOT NULL,
             is_recruiter INTEGER NOT NULL
         )
     ''')
@@ -22,19 +23,15 @@ def create_database():
     conn.commit()
     conn.close()
 
-# Create a SQLite database
-# conn = sqlite3.connect('recruitment.db')
-# cursor = conn.cursor()
-
 
 # Helper function to add a user
-def add_user(username, password, is_recruiter):
+def add_user(username, email_address, password, is_recruiter, conn, cursor):
     password_hash = pbkdf2_sha256.hash(password)
-    cursor.execute('INSERT INTO users (username, password, is_recruiter) VALUES (?, ?, ?)', (username, password_hash, is_recruiter))
+    cursor.execute('INSERT INTO users (username, password, email_address, is_recruiter) VALUES (?, ?, ?, ?)', (username, password_hash, email_address, is_recruiter))
     conn.commit()
 
-
-def create_user_profile(user_profiles, new_name, new_email, new_id, profile_picture, cv_file):
+user_profiles = []  # Initialize the user profiles list
+def create_user_profile(user_profiles, new_name, new_email, new_id, profile_picture, cv_file, conn, cursor):
     current_datetime = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     new_profile = {
         "Nom": new_name,
