@@ -1,13 +1,19 @@
 import streamlit as st
 import sqlite3
 from passlib.hash import pbkdf2_sha256
-from utils import add_user, create_user_profile, user_profiles
+from utils import add_user, save_profile_picture_to_profile, save_cv_to_profile, save_job_offer
 from utils import create_database
 
 # Create a SQLite database
 conn = sqlite3.connect('recruitment.db')
 cursor = conn.cursor()
+
+# Create the database tables
 create_database(conn, cursor)
+
+# Ensure session state user is initialized
+if 'user' not in st.session_state:
+    st.session_state.user = None
 
 # Navigation bar
 st.sidebar.title("Navigation")
@@ -42,8 +48,65 @@ elif page == "Login":
             st.write(f'Hello, {username}!')
             if user[2]:
                 st.write('You are a recruiter.')
+                st.write('You can submit a job offer.')
+
+
+                # Create a form to submit a job offer
+                job_offer_file = st.file_uploader("Upload Job Offer (PDF)", type=["pdf"])
+                if st.button('Submit Job Offer'):
+                    if job_offer_file is not None:
+                        # Define the path to save the uploaded job offer
+                        job_offer_path = f"my_app\data/recruiter_{user[0]}/{job_offer_file.name}"
+
+                        # Save the job offer to the database
+                        save_job_offer(user[0], job_offer_path, conn, cursor)
+
+                        # Save the uploaded job offer file to your server
+                        with open(job_offer_path, "wb") as f:
+                            f.write(job_offer_file.read())
+
+                        st.success("Job offer submitted successfully.")
+                    else:
+                        st.error("Please upload a valid PDF file for the job offer.")
             else:
                 st.write('You are a candidate.')
+                st.write('You can edit your profile.')
+
+                # Create a form to upload a profile picture
+                profile_picture = st.file_uploader("Upload Profile Picture (Image)", type=["jpg", "jpeg", "png"])
+                if st.button('Upload Profile Picture'):
+                    if profile_picture is not None:
+                        # Define the path to save the uploaded profile picture
+                        profile_picture_path = f"my_app/data/user_{user[0]}/{profile_picture.name}"  # Example path, adjust as needed
+
+                        # Save the profile picture to the user's profile in the database
+                        save_profile_picture_to_profile(user[0], profile_picture_path, conn, cursor)
+
+                        # Save the uploaded profile picture file to your server
+                        with open(profile_picture_path, "wb") as f:
+                            f.write(profile_picture.read())
+
+                            st.success("Profile picture uploaded successfully.")
+                    else:
+                        st.error("Please upload a valid image (jpg, jpeg, or png).")
+
+                # Create a form to upload a CV
+                cv_file = st.file_uploader("Upload CV (PDF)", type=["pdf"])
+                if st.button('Upload CV'):
+                    if cv_file is not None:
+                        # Define the path to save the uploaded CV
+                        cv_file_path = f"my_app/data/user_{user[0]}/{cv_file.name}"  # Example path, adjust as needed
+
+                        # Save the CV to the user's profile in the database
+                        save_cv_to_profile(user[0], cv_file_path, conn, cursor)
+
+                        # Save the uploaded CV file to your server
+                        with open(cv_file_path, "wb") as f:
+                            f.write(cv_file.read())
+
+                        st.success("CV uploaded successfully.")
+                    else:
+                        st.error("Please upload a valid PDF file.")
         else:
             st.error('Login failed. Check your credentials.')
 
@@ -51,57 +114,10 @@ elif page == "Register":
     st.title("User Registration")
     # Implement the registration form
     new_username = st.text_input('Username')
-    new_password = st.text_input('Password', type='password')
     new_email = st.text_input('Email')
+    new_password = st.text_input('Password', type='password')
     is_recruiter = st.checkbox('I am a recruiter')
 
     if st.button('Register', key="register_button"):
-        add_user(new_username, new_password, new_email, is_recruiter, conn, cursor)
+        add_user(new_username, new_email, new_password, is_recruiter, conn, cursor)
         st.success('Registration successful! You can now log in.')
-
-
-if 'user' not in st.session_state:
-    st.session_state.user = None
-
-elif page == "User Profile":
-    st.title("User Profile")
-
-    if st.session_state.user:
-        username = st.session_state.user  # Get the currently logged-in user's username
-
-        # Query the database to fetch user data.
-        cursor.execute('SELECT username, email_address FROM users WHERE username = ?', (username,))
-        user_data = cursor.fetchone()
-
-        if user_data:
-            username = user_data[0]
-            email = user_data[1]
-
-            # Display the user's profile information.
-            st.write(f"Username: {username}")
-            st.write(f"Email: {email}")
-
-            # Allow the user to upload a profile picture and a CV.
-            st.header("Edit Profile")
-            uploaded_profile_picture = st.file_uploader("Upload Profile Picture", type=["jpg", "jpeg", "png"])
-            uploaded_cv = st.file_uploader("Upload CV (PDF)", type=["pdf"])
-
-            if st.button("Save Changes"):
-                # Handle profile picture and CV uploads and update the user's data in the database.
-                if uploaded_profile_picture:
-                    # Process and save the profile picture.
-                    pass  # Add your logic here
-
-                if uploaded_cv:
-                    # Process and save the CV.
-                    pass  # Add your logic here
-
-                # Update the user's data in the database (e.g., username and email).
-                # You can use the user_data retrieved from the database to update the user's data.
-                # Replace the following lines with your actual database update logic.
-
-                st.success("Changes saved successfully!")
-        else:
-            st.error("User not found. Please log in.")
-    else:
-        st.error("You are not logged in. Please log in to view your profile.")
