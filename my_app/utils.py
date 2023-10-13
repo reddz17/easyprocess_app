@@ -37,16 +37,16 @@ def add_user(username, email_address, password, is_recruiter, conn, cursor):
     cursor.execute('INSERT INTO users (username, email_address, password, is_recruiter) VALUES (?, ?, ?, ?)', (username, email_address, password_hash, is_recruiter))
     conn.commit()
 
-@st.cache(allow_output_mutation=True)
+
 def save_cv_to_profile(user_id, cv_file_path, conn, cursor):
     cursor.execute("UPDATE users SET cv_file = ? WHERE id = ?", (cv_file_path, user_id))
     conn.commit()
-@st.cache(allow_output_mutation=True)
+
 def save_profile_picture_to_profile(user_id, profile_picture_path, conn, cursor):
     cursor.execute("UPDATE users SET profile_picture = ? WHERE id = ?", (profile_picture_path, user_id))
     conn.commit()
 
-@st.cache(allow_output_mutation=True)
+
 def save_job_offer(recruiter_id, job_offer_path, conn, cursor):
     cursor.execute('INSERT INTO job_offers (recruiter_id, offer_path) VALUES (?, ?)', (recruiter_id, job_offer_path))
     conn.commit()
