@@ -2,12 +2,13 @@ import sqlite3
 from passlib.hash import pbkdf2_sha256
 from datetime import datetime
 
-# Connect to the database
-conn = sqlite3.connect('recruitment.db')
-cursor = conn.cursor()
+
 
 def create_database(conn,cursor):
     # Create the database tables if they don't exist
+    # Connect to the database
+    conn = sqlite3.connect('recruitment.db')
+    cursor = conn.cursor()
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS Users (
             user_id INTEGER PRIMARY KEY,

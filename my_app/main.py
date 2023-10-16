@@ -37,34 +37,28 @@ class RecruitmentApp:
             
     def log_out(self):
         self.session_state['user'] = None
+        self.save_session_state()
+        st.experimental_rerun()
+
         
     def show_sidebar(self):
         st.sidebar.image(self.logo_path, width=300)
         with st.sidebar:
             sidebar_options = ["Home", "Search Jobs", "Login"]
-            if not self.login_user()[1]:
-                if self.session_state['user']:
-                    sidebar_options.append("Change Password")
-                    sidebar_options.remove("Login")
-                    sidebar_options.append("Log Out")
-                else:
-                    sidebar_options.append("Register")
-                sidebar_options.append("User Profile")
-                selected = option_menu("Main Menu", sidebar_options, icons=['house', 'lightbulb', 'star', 'person', 'gear'], menu_icon="cast", default_index=1)
+            if self.session_state['user']:
+                sidebar_options.append("Change Password")
+                sidebar_options.remove("Login")
+                sidebar_options.append("Log Out")
             else:
-                if self.session_state['user']:
-                    sidebar_options.append("Change Password")
-                    sidebar_options.remove("Login")
-                    sidebar_options.append("Log Out")
-                else:
-                    sidebar_options.append("Register")
-                sidebar_options.append("User Profile")
-                selected = option_menu("Main Menu", sidebar_options, icons=['house', 'lightbulb', 'star', 'person', 'gear'], menu_icon="cast", default_index=1)
-        return selected
+                sidebar_options.append("Register")
+            sidebar_options.append("User Profile")
+            selected = option_menu("Main Menu", sidebar_options, icons=['house', 'lightbulb', 'star', 'person', 'gear'], menu_icon="cast", default_index=1)
+            return selected
+    
     
     def authenticate_user(self, email, password):
         self.cursor.execute(
-            'SELECT id, password, is_recruiter, email_address, username FROM users WHERE email_address = ?', (email,))
+            'SELECT user_id, password, is_recruiter, email_address, username FROM users WHERE email_address = ?', (email,))
         user = self.cursor.fetchone()
         return user if user and pbkdf2_sha256.verify(password, user[1]) else None
     
@@ -76,23 +70,23 @@ class RecruitmentApp:
             user = self.authenticate_user(email, password)
             if user:
                 st.success('Login successful!')
-                st.empty()
                 self.session_state['user'] = user[4]  # Store the username in the session
                 self.save_session_state()
                 st.write(f'Hello, {user[4]}!')
+                st.experimental_rerun()
                 if user[2]:  # Check if the user is a recruiter
                     st.write('You are a recruiter.')
-                    return 0,user[0]
+                    return 0
                 else:
                     st.write('You are a candidate.')
-                    return 1,user[0]
+                    return 1
             else:
                 return st.error('Login failed. Check your credentials.')
                 
 
     def update_password(self, user_id, new_hashed_password):
         try:
-            self.cursor.execute('UPDATE users SET password = ? WHERE id = ?', (new_hashed_password, user_id))
+            self.cursor.execute('UPDATE users SET password = ? WHERE user_id = ?', (new_hashed_password, user_id))
             self.conn.commit()
             st.success('Password changed successfully!')
             # Update session state to avoid log out on page refresh
@@ -123,7 +117,7 @@ class RecruitmentApp:
     def update_user_data(self, username, email, profile_picture, cv):
         self.cursor.execute('UPDATE users SET email_address = ? WHERE username = ?', (email, username))
         self.conn.commit()
-        if self.login_user()[0]:
+        if self.session_state['user']:
             if profile_picture:
                 profile_picture_path = os.path.join(f"data/user_{username}/profile_picture/{username}.jpg")
                 os.makedirs(os.path.dirname(profile_picture_path),exist_ok=True)
@@ -144,12 +138,12 @@ class RecruitmentApp:
             with open(profile_picture_path, "wb") as f:
                 f.write(profile_picture.read())
             save_profile_picture(profile_picture_path,username)
-        elif job_offer:
+        if job_offer:
             job_offer_path = os.path.join(f"data/user_{username}/offres/{username}.pdf")
             os.makedirs(os.path.dirname(job_offer_path),exist_ok=True)
             with open(job_offer_path, "wb") as f:
                 f.write(job_offer.read())
-            save_job_offer(self.login_user()[1],job_offer_path)
+            save_job_offer(self.session_state['user'],job_offer_path)
             
     def show_user_profile(self):
         st.title("User Profile")
@@ -162,10 +156,10 @@ class RecruitmentApp:
                 st.write(f"Email: {email}")
                 st.header("Edit Profile")
                 uploaded_profile_picture = st.file_uploader("Upload Profile Picture", type=["jpg", "jpeg", "png"])
-                uploaded_cv = st.file_uploader("Upload CV (PDF)", type=["pdf"])
+                job_offer = st.file_uploader("Upload job offer (PDF)", type=["pdf"])
                 if st.button("Save Changes"):
-                    self.update_user_data(username, email, uploaded_profile_picture, uploaded_cv)
-                st.success("Changes saved successfully!")
+                    self.update_recruiter_data(username, uploaded_profile_picture, job_offer)
+                    st.success("Changes saved successfully!")
             else:
                 username, email = user_data[1], user_data[3]
                 st.write(f"Username: {username}")
@@ -175,15 +169,13 @@ class RecruitmentApp:
                 uploaded_cv = st.file_uploader("Upload CV (PDF)", type=["pdf"])
                 if st.button("Save Changes"):
                     self.update_user_data(username, email, uploaded_profile_picture, uploaded_cv)
-                st.success("Changes saved successfully!")
-                    
-                st.error("User not found. Please log in.")
+                    st.success("Changes saved successfully!")        
         else:
             st.error("You are not logged in. Please log in to view your profile.")
 
 
     def fetch_user_data(self, username):
-        self.cursor.execute('SELECT id, username, password, email_address, is_recruiter FROM users WHERE username = ?', (username,))
+        self.cursor.execute('SELECT user_id, username, password, email_address, is_recruiter FROM users WHERE username = ?', (username,))
         return self.cursor.fetchone()
 
     def show_change_password(self):
