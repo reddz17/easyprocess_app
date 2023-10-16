@@ -121,22 +121,23 @@ class RecruitmentApp:
         self.conn.commit()
 
     def update_user_data(self, username, email, profile_picture, cv):
-        # self.cursor.execute('UPDATE users SET email_address = ? WHERE username = ?', (email, username))
-        # self.conn.commit()
-        if profile_picture:
-            profile_picture_path = os.path.join(f"data/user_{username}/profile_picture/{username}.jpg")
-            os.makedirs(os.path.dirname(profile_picture_path),exist_ok=True)
-            with open(profile_picture_path, "wb") as f:
-                f.write(profile_picture.read())
-            save_profile_picture(profile_picture_path, username)
-        if cv:
-            cv_path = os.path.join(f"data/user_{username}/CV/{username}_cv.pdf")
-            os.makedirs(os.path.dirname(cv_path),exist_ok=True)
-            with open(cv_path, "wb") as f:
-                f.write(cv.read())
-            save_cv_path(cv_path,username)
+        self.cursor.execute('UPDATE users SET email_address = ? WHERE username = ?', (email, username))
+        self.conn.commit()
+        if self.login_user()[0]:
+            if profile_picture:
+                profile_picture_path = os.path.join(f"data/user_{username}/profile_picture/{username}.jpg")
+                os.makedirs(os.path.dirname(profile_picture_path),exist_ok=True)
+                with open(profile_picture_path, "wb") as f:
+                    f.write(profile_picture.read())
+                save_profile_picture(profile_picture_path, username)
+            if cv:
+                cv_path = os.path.join(f"data/user_{username}/CV/{username}_cv.pdf")
+                os.makedirs(os.path.dirname(cv_path),exist_ok=True)
+                with open(cv_path, "wb") as f:
+                    f.write(cv.read())
+                save_cv_path(cv_path,username)
                 
-    def update_recruiter_data(self, name_offer, username, profile_picture, job_offer):
+    def update_recruiter_data(self, username, profile_picture, job_offer):
         if profile_picture:
             profile_picture_path = os.path.join(f"data/user_{username}/profile_picture/{username}.jpg")
             os.makedirs(os.path.dirname(profile_picture_path),exist_ok=True)
@@ -144,11 +145,11 @@ class RecruitmentApp:
                 f.write(profile_picture.read())
             save_profile_picture(profile_picture_path,username)
         elif job_offer:
-            job_offer_path = os.path.join(f"data/user_{username}/offres/{name_offer}.pdf")
+            job_offer_path = os.path.join(f"data/user_{username}/offres/{username}.pdf")
             os.makedirs(os.path.dirname(job_offer_path),exist_ok=True)
             with open(job_offer_path, "wb") as f:
                 f.write(job_offer.read())
-            save_job_offer(self.login_user()[1],job_offer_path,name_offer)
+            save_job_offer(self.login_user()[1],job_offer_path)
             
     def show_user_profile(self):
         st.title("User Profile")
@@ -171,9 +172,9 @@ class RecruitmentApp:
                 st.write(f"Email: {email}")
                 st.header("Edit Profile")
                 uploaded_profile_picture = st.file_uploader("Upload Profile Picture", type=["jpg", "jpeg", "png"])
-                uploaded_offer = st.file_uploader("Upload offer (PDF)", type=["pdf"])
+                uploaded_cv = st.file_uploader("Upload CV (PDF)", type=["pdf"])
                 if st.button("Save Changes"):
-                    self.update_recruiter_data(username, email, uploaded_profile_picture, uploaded_offer)
+                    self.update_user_data(username, email, uploaded_profile_picture, uploaded_cv)
                 st.success("Changes saved successfully!")
                     
                 st.error("User not found. Please log in.")
