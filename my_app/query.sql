@@ -1,1 +1,1 @@
-delete from users
+select * from users
