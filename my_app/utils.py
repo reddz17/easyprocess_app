@@ -3,8 +3,7 @@ from passlib.hash import pbkdf2_sha256
 from datetime import datetime
 
 
-
-def create_database(conn,cursor):
+def create_database(conn, cursor):
     # Create the database tables if they don't exist
     # Connect to the database
     conn = sqlite3.connect('recruitment.db')
@@ -12,7 +11,7 @@ def create_database(conn,cursor):
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS Users (
             user_id INTEGER PRIMARY KEY,
-            username TEXT UNIQUE NOT NULL,
+            username TEXT NOT NULL,
             password TEXT NOT NULL,
             email_address TEXT NOT NULL,
             is_recruiter BOOLEAN NOT NULL,
@@ -48,6 +47,8 @@ def create_database(conn,cursor):
     conn.close()
 
 # Helper function to add a user
+
+
 def add_user(username, email_address, password, is_recruiter):
     conn = sqlite3.connect('recruitment.db')
     cursor = conn.cursor()
@@ -58,6 +59,8 @@ def add_user(username, email_address, password, is_recruiter):
     conn.close()
 
 # Helper function to save a job offer
+
+
 def save_job_offer(recruiter_id, offer_path, name_offer, title, description, location, salary):
     conn = sqlite3.connect('recruitment.db')
     cursor = conn.cursor()
@@ -66,32 +69,68 @@ def save_job_offer(recruiter_id, offer_path, name_offer, title, description, loc
     conn.commit()
     conn.close()
 
-# Helper function to save a user's profile picture
-def save_profile_picture(username, profile_picture_path):
+
+def change_password(new_hashed_password, user_id):
     conn = sqlite3.connect('recruitment.db')
     cursor = conn.cursor()
-    cursor.execute('UPDATE Users SET profile_picture = ? WHERE username = ?', (profile_picture_path, username))
+    cursor.execute(
+        'UPDATE users SET password = ? WHERE user_id = ?', (new_hashed_password, user_id))
     conn.commit()
-    conn.close()
+
+
+def fetch_user_data(username):
+    conn = sqlite3.connect('recruitment.db')
+    cursor = conn.cursor()
+    cursor.execute(
+        'SELECT user_id, username, password, email_address, is_recruiter FROM users WHERE username = ?', (username,))
+    return cursor.fetchone()
+# Helper function to save a user's profile picture
+
+
+def save_profile_picture(profile_picture_path, user_id):
+    conn = sqlite3.connect('recruitment.db')
+    cursor = conn.cursor()
+    try:
+        cursor.execute('UPDATE Users SET profile_picture = ? WHERE user_id = ?',
+                       (profile_picture_path, user_id))
+        conn.commit()
+    except sqlite3.Error as e:
+        conn.rollback()
+        print(f"Error updating profile picture: {e}")
+    finally:
+        conn.close()
+
+def get_uploaded_candidate_files(u_id):
+    conn = sqlite3.connect('recruitment.db')
+    cursor = conn.cursor()
+    # Assuming you have a table in your database that stores candidate files
+    cursor.execute(
+        'SELECT profile_picture, cv_path FROM Users WHERE user_id = ?', (u_id,))
+    user_files = cursor.fetchone()
+    profile_picture_path = user_files[0]
+    cv_path = user_files[1]
+    return profile_picture_path, cv_path
+
 
 # Helper function to save a user's CV path
-def save_cv_path(username, cv_path):
+def authenticate_user(email, password):
     conn = sqlite3.connect('recruitment.db')
     cursor = conn.cursor()
-    cursor.execute('UPDATE Users SET cv_path = ? WHERE username = ?', (cv_path, username))
-    conn.commit()
-    conn.close()
+    cursor.execute(
+        'SELECT user_id, password, is_recruiter, email_address, username FROM users WHERE email_address = ?', (email,))
+    user = cursor.fetchone()
+    return user if user and pbkdf2_sha256.verify(password, user[1]) else None
 
-# Helper function to create a user profile
-def create_user_profile(new_name, new_email, new_id, profile_picture, cv_file):
-    current_datetime = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    new_profile = {
-        "Nom": new_name,
-        "Email": new_email,
-        "ID Utilisateur": new_id,
-        "Date d'inscription": current_datetime,
-        "Dernière Connexion": None,
-        "Photo de Profil": profile_picture,
-        "CV (PDF)": cv_file,
-    }
-    user_profiles.append(new_profile)
+
+def save_cv_path(cv_path, user_id):
+    conn = sqlite3.connect('recruitment.db')
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            'UPDATE Users SET cv_path = ? WHERE user_id = ?', (cv_path, user_id))
+        conn.commit()
+    except sqlite3.Error as e:
+        conn.rollback()
+        print(f"Error updating CV path: {e}")
+    finally:
+        conn.close()
