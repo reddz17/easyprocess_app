@@ -84,11 +84,11 @@ def change_password(new_hashed_password, user_id):
     conn.close
 
 
-def fetch_user_data(username):
+def fetch_user_data(user_id):
     conn = sqlite3.connect('recruitment.db')
     cursor = conn.cursor()
     cursor.execute(
-        'SELECT user_id, username, password, email_address, is_recruiter FROM Candidats WHERE username = ?', (username,))
+        'SELECT user_id, username, password, email_address, is_recruiter FROM Candidats WHERE user_id = ?', (user_id,))
     return cursor.fetchone()
 # Helper function to save a user's profile picture
 

@@ -12,7 +12,8 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import hashlib
 from env import ENV_PASSWORD, ENV_EMAIL
-
+import streamlit as st
+import requests
 
 class RecruitmentApp:
     def __init__(self):
@@ -82,14 +83,15 @@ class RecruitmentApp:
     
     def login_user(self):
         st.title("User Login")
-        email = st.text_input('Email')
+        email = st.text_input('Email').lower()
         password = st.text_input('Password', type='password')
         if st.button('Login', key="login_button"):
             user = authenticate_user(email, password)
+            print(user)
             if user:
                 st.success('Login successful!')
                 # Store the username in the session
-                self.session_state['user'] = user[4]
+                self.session_state['user'] = user[0]
                 self.save_session_state()
                 st.write(f'Hello, {user[4]}!')
                 st.rerun()
@@ -170,6 +172,7 @@ class RecruitmentApp:
                 st.success("Password reset confirmation email sent. Please check your email.")
             else:
                 st.error("Email not found. Please enter a registered email address")
+
 
     def send_outlook_email(self, reset_email, confirmation_link):
         # Email configuration
@@ -284,8 +287,10 @@ class RecruitmentApp:
         self.last_activity = time.time()
         st.title("User Profile")
         if self.session_state['user']:
-            username = self.session_state['user']
-            user_data = fetch_user_data(username)
+            user_id = self.session_state['user']
+            print(user_id)
+            user_data = fetch_user_data(user_id)
+            print(user_data)
             if user_data[4]:
                 u_id, username, email = user_data[0], user_data[1], user_data[3]
                 pic_path, cv_path = get_uploaded_candidate_files(u_id)
@@ -396,37 +401,33 @@ class RecruitmentApp:
     def show_change_password(self):
         self.last_activity = time.time()
         st.title("Change Password")
-        if self.session_state['user']:
-            username = self.session_state['user']
-            current_password =  st.text_input('Current Password', type='password')
-            new_password = st.text_input('New Password', type='password')
-            confirm_password = st.text_input(
-                'Confirm New Password', type='password')
-            if st.button("Change Password"):
-                if not new_password:
-                    st.error("New password cannot be empty.")
-                elif new_password != confirm_password:
-                    st.error("New passwords do not match.")
-                else:
-                    user_data = fetch_user_data(username)
-                    if user_data:
-                        user_id, current_hashed_password = user_data[0], user_data[2]
-                        if pbkdf2_sha256.verify(current_password, current_hashed_password):
-                            new_hashed_password = pbkdf2_sha256.hash(
-                                new_password)
-                            self.update_password(user_id, new_hashed_password)
-                            st.success("Password changed successfully.")
-                            st.rerun()
-                        else:
-                            st.error("Current password is incorrect.")
-                    else:
-                        st.error("User not found. Please log in.")
+        if not self.session_state['user']:
+            st.error("You are not logged in. Please log in to change your password.")
+            return
+        user_id = self.session_state['user']
+        user_data = fetch_user_data(user_id)
+        if not user_data:
+            st.error("User not found. Please log in.")
+            return
+        user_id, current_hashed_password = user_data[0], user_data[2]
+        current_password = st.text_input('Current Password', type='password')
+        new_password = st.text_input('New Password', type='password')
+        confirm_password = st.text_input('Confirm New Password', type='password')
+        if st.button("Change Password"):
+            if not new_password:
+                st.error("New password cannot be empty.")
+                return
+            if new_password != confirm_password:
+                st.error("New passwords do not match.")
+                return
+            # Print for debugging purposes
+            if pbkdf2_sha256.verify(current_password,current_hashed_password ):
+                new_hashed_password = pbkdf2_sha256.hash(new_password)
+                self.update_password(user_id, new_hashed_password)
+                st.success("Password changed successfully.")
+                # st.rerun()
             else:
-                st.warning(
-                    "Fill in the password fields and click 'Change Password' to proceed.")
-        else:
-            st.error(
-                "You are not logged in. Please log in to change your password.")
+                st.error("Current password is incorrect.")
 
 
 if __name__ == "__main__":
