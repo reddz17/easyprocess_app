@@ -6,9 +6,11 @@ import pickle
 import os
 from utils import *
 import time
-
-
-SESSION_TIMEOUT = 300
+import re 
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import hashlib
 
 
 class RecruitmentApp:
@@ -20,10 +22,12 @@ class RecruitmentApp:
         self.load_session_state()
         self.initialize_session_state()
         self.last_activity = time.time()  # Initialize last activity time
+        self.SESSION_TIMEOUT = 60
+        
 
     def check_session_timeout(self):
         # Check if the session has timed out due to inactivity
-        if time.time() - self.last_activity > SESSION_TIMEOUT:
+        if time.time() - self.last_activity > self.SESSION_TIMEOUT:
             self.log_out()
 
     def initialize_session_state(self):
@@ -48,8 +52,16 @@ class RecruitmentApp:
         self.session_state['user'] = None
         if os.path.exists('session_state.pkl'):
             os.remove('session_state.pkl')
-        st.experimental_rerun()
-
+        st.rerun()
+    
+    def is_valid_email(self,email):
+        email_pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'
+        return re.match(email_pattern,email) is not None
+    
+    def is_valid_password(self,password):
+        return len(password)>=12 and any(c.isupper() for c in password)and\
+               any(c.islower() for c in password) and any(c.isdigit() for c in password) 
+      
     def show_sidebar(self):
         self.last_activity = time.time()
         st.sidebar.image(self.logo_path, width=300)
@@ -59,13 +71,14 @@ class RecruitmentApp:
                 sidebar_options.append("Change Password")
                 sidebar_options.remove("Login")
                 sidebar_options.append("Log Out")
+                sidebar_options.append("User Profile")
             else:
                 sidebar_options.append("Register")
-            sidebar_options.append("User Profile")
             selected = option_menu("Main Menu", sidebar_options, icons=[
-                                   'house', 'lightbulb', 'star', 'person', 'gear'], menu_icon="cast", default_index=1)
+                                   'house', 'lightbulb', 'star', 'person', 'gear'], menu_icon="cast", default_index=0)
             return selected
-
+    
+    
     def login_user(self):
         st.title("User Login")
         email = st.text_input('Email')
@@ -78,7 +91,7 @@ class RecruitmentApp:
                 self.session_state['user'] = user[4]
                 self.save_session_state()
                 st.write(f'Hello, {user[4]}!')
-                st.experimental_rerun()
+                st.rerun()
                 if user[2]:  # Check if the user is a recruiter
                     st.write('You are a recruiter.')
                     return 0
@@ -92,7 +105,6 @@ class RecruitmentApp:
         self.last_activity = time.time()
         try:
             change_password(new_hashed_password, user_id)
-            st.success('Password changed successfully!')
             # Update session state to avoid log out on page refresh
             self.session_state['user'] = fetch_user_data(
                 self.session_state['user'])[0]
@@ -104,15 +116,141 @@ class RecruitmentApp:
         st.title("User Registration")
         new_username = st.text_input('Username')
         new_password = st.text_input('Password', type='password')
+        confirm_password = st.text_input('Confirm Password', type='password')
         new_email = st.text_input('Email')
         is_recruiter = st.checkbox('I am a recruiter')
+        show_error = False
+        email_already_exists = check_email_exists(new_email)
         if st.button('Register', key="register_button"):
-            add_user(new_username, new_password, new_email, is_recruiter)
-            st.success('Registration successful! You can now log in.')
-            self.session_state['user'] = new_username
-            self.save_session_state()
-            st.experimental_rerun()
+            # Convert email to lowercase
+            new_email = new_email.lower()
+            # Check if the email already exists
+            if check_email_exists(new_email):
+                st.error("Email already exists. Please use a different email.")
+                show_error = True
+            # Validate email
+            if not self.is_valid_email(new_email):
+                st.error("Please enter a valid email address")
+                show_error = True  
+            # Validate password
+            if not self.is_valid_password(new_password):
+                st.error("Password must be at least 12 characters with at least one uppercase letter, one lowercase letter, and one digit")
+                show_error = True       
+            # Check if passwords match
+            if new_password != confirm_password:
+                st.error("Passwords do not match")
+                show_error = True
+            if email_already_exists:
+                # Display the "Reset Password" button if the email already exists
+                st.warning("This email is already registered. You can reset your password.")
+                if st.button("Reset Password"):
+                    # Implement the password reset functionality here
+                    self.reset_password()    
+            if not show_error:
+                registration = add_user(new_username, new_email, new_password, is_recruiter)
+                if registration:
+                    st.success('Registration successful! You can now log in.')
+                    self.session_state['user'] = new_username
+                    self.save_session_state()
+                    st.rerun()
+                else:
+                    st.error('User registration failed. Please try again.')
+        else:
+            if show_error:
+                st.error("Please correct the errors in the form")
+                
+    def reset_password(self):
+        st.title("Reset Password")
+        st.markdown("[Reset Password](#reset-password)")
+        reset_email = st.text_input("Enter your registered email address")
+        if st.button("Reset Password"):
+            # Check if the email exists in the database
+            user_data = fetch_user_data_mail(reset_email)
+            if user_data:
+                # Generate a confirmation link for password reset
+                confirmation_link = self.generate_confirmation_link(reset_email)
+                self.send_outlook_email(reset_email, confirmation_link)
+                st.success("Password reset confirmation email sent. Please check your email.")
+            else:
+                st.error("Email not found. Please enter a registered email address")
 
+    def send_outlook_email(self, reset_email, confirmation_link):
+        # Email configuration
+        smtp_server = "smtp-mail.outlook.com"
+        smtp_port = 587
+        sender_email = "w_khirdine@hetic.eu"  # Your email address
+        sender_password = "3PcmgT8r"  # Your email password
+        
+        # Create an email message
+        message = MIMEMultipart()
+        message["From"] = sender_email
+        message["To"] = reset_email
+        message["Subject"] = "Password Reset Confirmation"
+        body = f'Click the following link to reset your password: {confirmation_link}'
+        message.attach(MIMEText(body, "plain"))
+        
+        # Establish an SMTP connection and send the email
+        try:
+            server = smtplib.SMTP(smtp_server, smtp_port)
+            server.starttls()
+            server.login(sender_email, sender_password)
+            server.sendmail(sender_email, reset_email, message.as_string())
+            server.quit()
+        except Exception as e:
+            st.error(f"Error sending confirmation email: {str(e)}")
+
+    def generate_confirmation_link(self, email):
+        # Generate a unique token based on the user's email and current timestamp
+        token = hashlib.md5((email + str(time.time())).encode()).hexdigest()
+        # Construct the confirmation link with the token
+        confirmation_link = f"http://localhost:8501/reset_password?token={token}"
+        return confirmation_link
+    
+    # def register_user(self):
+    #         st.title("User Registration")
+    #         new_username = st.text_input('Username')
+    #         new_password = st.text_input('Password', type='password')
+    #         confirm_password = st.text_input('Confirm Password', type='password')
+    #         new_email = st.text_input('Email')
+    #         is_recruiter = st.checkbox('I am a recruiter')
+    #         show_error = False
+
+    #         # Check if the email already exists
+    #         email_already_exists = check_email_exists(new_email)
+            
+    #         if st.button('Register', key="register_button"):
+    #             # Convert email to lowercase
+    #             new_email = new_email.lower()
+    #             # Validate email
+    #             if not self.is_valid_email(new_email):
+    #                 st.error("Please enter a valid email address")
+    #                 show_error = True
+    #             # Validate password
+    #             if not self.is_valid_password(new_password):
+    #                 st.error("Password must be at least 8 characters with at least one uppercase letter, one lowercase letter, and one digit")
+    #                 show_error = True
+    #             # Check if passwords match
+    #             if new_password != confirm_password:
+    #                 st.error("Passwords do not match")
+    #                 show_error = True
+    #             # if email_already_exists:
+    #             #     # Display the "Reset Password" button if the email already exists
+    #             #     st.warning("This email is already registered. You can reset your password.")
+    #             #     if st.button("Reset Password"):
+    #             #         # Implement the password reset functionality here
+    #             #         self.reset_password()
+    #             elif not show_error:
+    #                 registration = add_user(new_username, new_email, new_password, is_recruiter)
+    #                 if registration:
+    #                     st.success('Registration successful! You can now log in.')
+    #                     self.session_state['user'] = new_username
+    #                     self.save_session_state()
+    #                     st.rerun()
+    #         else:
+    #             if show_error:
+    #                 st.error("Please correct the errors in the form")
+
+    
     def update_user_data(self, user_id, profile_picture, cv):
         if self.session_state['user']:
             if profile_picture:
@@ -145,7 +283,7 @@ class RecruitmentApp:
             os.makedirs(os.path.dirname(job_offer_path), exist_ok=True)
             with open(job_offer_path, "wb") as f:
                 f.write(job_offer.read())
-            save_job_offer(job_offer_path, user_id)
+            save_job_offer(user_id, job_offer, name_offer, title, description, location, salary )
 
     def show_user_profile(self):
         self.last_activity = time.time()
@@ -155,17 +293,56 @@ class RecruitmentApp:
             user_data = fetch_user_data(username)
             if user_data[4]:
                 u_id, username, email = user_data[0], user_data[1], user_data[3]
+                pic_path, cv_path = get_uploaded_candidate_files(u_id)
                 st.write(f"Username: {username}")
                 st.write(f"Email: {email}")
+                st.header("You picture")
+                if pic_path:
+                    st.image(pic_path, caption="Profile Picture", width=300)
+                st.header("You CV")
+                if cv_path:
+                    with open(cv_path, 'rb') as pdf_file:
+                        pdf_bytes = pdf_file.read()
+                    st.download_button(
+                        label="Download PDF",
+                        data=pdf_bytes,
+                        key="pdf_download_button",
+                        file_name=(f"{email}.pdf"),
+                    )
                 st.header("Edit Profile")
                 uploaded_profile_picture = st.file_uploader(
-                    "Upload Profile Picture", type=["jpg", "jpeg", "png"])
-                job_offer = st.file_uploader(
-                    "Upload job offer (PDF)", type=["pdf"])
+                    "Upload Profile Picture (max size: 5 MB)",
+                    type=["jpg", "jpeg", "png"],
+                    key="profile_picture_uploader",
+                    accept_multiple_files=False
+                )
+                if uploaded_profile_picture:
+                    # Check the file size
+                    if len(uploaded_profile_picture.getvalue()) > 5 * 1024 * 1024:  # 5 MB limit
+                        st.error(
+                            "File size exceeds the allowed limit (5 MB). Please upload a smaller file.")
+                    else:
+                        # Process the file
+                        st.success("Profile picture uploaded successfully.")
+                uploaded_cv = st.file_uploader(
+                    "Upload CV (PDF) (max size: 10 MB)",
+                    type=["pdf"],
+                    key="cv_uploader",
+                    accept_multiple_files=False
+                )
+                if uploaded_cv:
+                    # Check the file size
+                    if len(uploaded_cv.getvalue()) > 10 * 1024 * 1024:  # 10 MB limit
+                        st.error(
+                            "File size exceeds the allowed limit (10 MB). Please upload a smaller file.")
+                    else:
+                        # Process the file
+                        st.success("CV uploaded successfully.")
                 if st.button("Save Changes"):
-                    self.update_recruiter_data(
-                        u_id, uploaded_profile_picture, job_offer)
+                    self.update_user_data(
+                        u_id, uploaded_profile_picture, uploaded_cv)
                     st.success("Changes saved successfully!")
+                    st.rerun()
             else:
                 u_id, username, email = user_data[0], user_data[1], user_data[3]
                 pic_path, cv_path = get_uploaded_candidate_files(u_id)
@@ -217,7 +394,7 @@ class RecruitmentApp:
                     self.update_user_data(
                         u_id, uploaded_profile_picture, uploaded_cv)
                     st.success("Changes saved successfully!")
-                    st.experimental_rerun()
+                    st.rerun()
         else:
             st.error("You are not logged in. Please log in to view your profile.")
 
@@ -226,8 +403,7 @@ class RecruitmentApp:
         st.title("Change Password")
         if self.session_state['user']:
             username = self.session_state['user']
-            current_password = pbkdf2_sha256.hash(
-                st.text_input('Current Password', type='password'))
+            current_password =  st.text_input('Current Password', type='password')
             new_password = st.text_input('New Password', type='password')
             confirm_password = st.text_input(
                 'Confirm New Password', type='password')
@@ -245,6 +421,7 @@ class RecruitmentApp:
                                 new_password)
                             self.update_password(user_id, new_hashed_password)
                             st.success("Password changed successfully.")
+                            st.rerun()
                         else:
                             st.error("Current password is incorrect.")
                     else:
@@ -262,6 +439,8 @@ if __name__ == "__main__":
     create_database(app.conn, app.cursor)
     selected_option = app.show_sidebar()
     app.check_session_timeout()
+    if selected_option == "Reset Password":
+        app.reset_password()
     if selected_option == "Home":
         st.title("Welcome to Your Recruitment Platform")
         st.write("Browse the latest job listings below:")
@@ -273,7 +452,7 @@ if __name__ == "__main__":
 
     elif selected_option == "Login":
         app.login_user()
-
+        app.reset_password()
     elif selected_option == "Register":
         app.register_user()
 
