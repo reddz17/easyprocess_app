@@ -11,6 +11,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import hashlib
+from env import ENV_PASSWORD, ENV_EMAIL
 
 
 class RecruitmentApp:
@@ -23,7 +24,6 @@ class RecruitmentApp:
         self.initialize_session_state()
         self.last_activity = time.time()  # Initialize last activity time
         self.SESSION_TIMEOUT = 60
-        
 
     def check_session_timeout(self):
         # Check if the session has timed out due to inactivity
@@ -74,6 +74,7 @@ class RecruitmentApp:
                 sidebar_options.append("User Profile")
             else:
                 sidebar_options.append("Register")
+                sidebar_options.append("Reset Password")
             selected = option_menu("Main Menu", sidebar_options, icons=[
                                    'house', 'lightbulb', 'star', 'person', 'gear'], menu_icon="cast", default_index=0)
             return selected
@@ -143,9 +144,6 @@ class RecruitmentApp:
             if email_already_exists:
                 # Display the "Reset Password" button if the email already exists
                 st.warning("This email is already registered. You can reset your password.")
-                if st.button("Reset Password"):
-                    # Implement the password reset functionality here
-                    self.reset_password()    
             if not show_error:
                 registration = add_user(new_username, new_email, new_password, is_recruiter)
                 if registration:
@@ -161,7 +159,6 @@ class RecruitmentApp:
                 
     def reset_password(self):
         st.title("Reset Password")
-        st.markdown("[Reset Password](#reset-password)")
         reset_email = st.text_input("Enter your registered email address")
         if st.button("Reset Password"):
             # Check if the email exists in the database
@@ -178,9 +175,8 @@ class RecruitmentApp:
         # Email configuration
         smtp_server = "smtp-mail.outlook.com"
         smtp_port = 587
-        sender_email = "w_khirdine@hetic.eu"  # Your email address
-        sender_password = "3PcmgT8r"  # Your email password
-        
+        sender_email =  ENV_EMAIL # Your email address
+        sender_password = ENV_PASSWORD # Your email password
         # Create an email message
         message = MIMEMultipart()
         message["From"] = sender_email
@@ -188,7 +184,6 @@ class RecruitmentApp:
         message["Subject"] = "Password Reset Confirmation"
         body = f'Click the following link to reset your password: {confirmation_link}'
         message.attach(MIMEText(body, "plain"))
-        
         # Establish an SMTP connection and send the email
         try:
             server = smtplib.SMTP(smtp_server, smtp_port)
@@ -452,7 +447,6 @@ if __name__ == "__main__":
 
     elif selected_option == "Login":
         app.login_user()
-        app.reset_password()
     elif selected_option == "Register":
         app.register_user()
 
