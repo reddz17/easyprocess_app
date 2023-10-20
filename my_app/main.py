@@ -12,8 +12,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import hashlib
 from env import ENV_PASSWORD, ENV_EMAIL
-import streamlit as st
-import requests
+import json
 
 class RecruitmentApp:
     def __init__(self):
@@ -25,7 +24,11 @@ class RecruitmentApp:
         self.initialize_session_state()
         self.last_activity = time.time()  # Initialize last activity time
         self.SESSION_TIMEOUT = 60
+        self.token_dict = {}
 
+        
+        
+        
     def check_session_timeout(self):
         # Check if the session has timed out due to inactivity
         if time.time() - self.last_activity > self.SESSION_TIMEOUT:
@@ -79,7 +82,8 @@ class RecruitmentApp:
             selected = option_menu("Main Menu", sidebar_options, icons=[
                                    'house', 'lightbulb', 'star', 'person', 'gear'], menu_icon="cast", default_index=0)
             return selected
-    
+
+   
     
     def login_user(self):
         st.title("User Login")
@@ -159,33 +163,116 @@ class RecruitmentApp:
             if show_error:
                 st.error("Please correct the errors in the form")
                 
+                
     def reset_password(self):
-        st.title("Reset Password")
-        reset_email = st.text_input("Enter your registered email address")
-        if st.button("Reset Password"):
-            # Check if the email exists in the database
+        st.title("Enter your Email")
+        reset_email = st.text_input("Enter your registered email address").lower()
+        if st.button("Reset Password", key="reset_password_button"):
+            self.reset_password_step = "step 2"  # Set the step to "change"
+            print(self.reset_password_step)
             user_data = fetch_user_data_mail(reset_email)
             if user_data:
-                # Generate a confirmation link for password reset
                 confirmation_link = self.generate_confirmation_link(reset_email)
                 self.send_outlook_email(reset_email, confirmation_link)
                 st.success("Password reset confirmation email sent. Please check your email.")
+                token = confirmation_link  # Encode the token
+                self.destroy_token_locally()
+                self.store_token_locally(token, reset_email)  # Store the token
             else:
-                st.error("Email not found. Please enter a registered email address")
+                st.error("Email not found. Please enter a registered email address.")
+
+
+    
+    def generate_confirmation_link(self, email):
+        token = hashlib.md5((email + str(time.time())).encode()).hexdigest()
+        confirmation_link = f"{token}"
+        return confirmation_link
+    
+    def store_token_locally(self, token, email):
+        token_dict = self.token_dict  # Assuming self.token_dict is the dictionary containing tokens and emails
+        # Store the token and associate it with the email
+        token_dict[token] = email
+        # Now, you can save the entire dictionary as JSON in a text file or any storage medium
+        with open("reset_token.json", "w") as token_file:
+            json.dump(token_dict, token_file)
+                
+
+    def retrieve_token_locally(self):
+        try:
+            with open("reset_token.json", "r") as token_file:
+                token_dict = json.load(token_file)
+                # You can return the entire token dictionary or a specific token value depending on your needs
+                # For example, to get the value associated with a specific token, you can do:
+                # token_value = token_dict.get(token, None)
+                return list(token_dict.keys())[0]
+        except FileNotFoundError:
+            # Handle the case where the file doesn't exist or is empty
+            return {}
+
+    def destroy_token_locally(self):
+        # Here you can destroy or remove the token from local storage
+        # For example, you can delete the text file
+        if os.path.exists("reset_token.json"):
+            os.remove("reset_token.json")
+            
+    def retrieve_user_email_from_token(self, token):
+        try:
+            with open("reset_token.json", "r") as token_file:
+                token_dict = json.load(token_file)
+                # Check if the token exists in the dictionary
+                email = token_dict.get(token, None)
+                return email
+        except (FileNotFoundError, json.JSONDecodeError):
+            # Handle the case where the file doesn't exist or is empty, or the JSON is invalid
+            return None
+
+    def change_password_with_token(self):
+        st.title("Change Password with Token")
+        token = st.text_input("Enter the password reset token")
+        stored_token = self.retrieve_token_locally()
+        feedback_message = st.empty()  # Create an empty space for feedback
+        if st.button("Reset Password"):
+            if token == stored_token:
+                feedback_message.success("Token is valid. You can now reset your password.")
+                feedback_message = st.empty()
+                # Implement the password reset functionality here
+                # Allow the user to enter and confirm the new password
+                new_password = st.text_input("New Password", type="password")
+                confirme_password = st.text_input("New Password", type="password")
+                if confirme_password == new_password:
+                    # Perform the password reset
+                    user_email = self.retrieve_user_email_from_token(token)
+                    new_hashed_password = pbkdf2_sha256.hash(new_password)
+                    change_password(new_hashed_password, user_email)
+                    feedback_message.success("Password reset successfully. You can now log in with your new password.")
+                else:
+                    feedback_message.error("Invalid password. Please check and try again.")
+            else:
+                feedback_message.error("Invalid token. Please check and try again.")
+
+
+
+
+
+
+
+
 
 
     def send_outlook_email(self, reset_email, confirmation_link):
         # Email configuration
         smtp_server = "smtp-mail.outlook.com"
         smtp_port = 587
-        sender_email =  ENV_EMAIL # Your email address
-        sender_password = ENV_PASSWORD # Your email password
+        sender_email = ENV_EMAIL  # Your email address
+        sender_password = ENV_PASSWORD  # Your email password
         # Create an email message
         message = MIMEMultipart()
         message["From"] = sender_email
         message["To"] = reset_email
         message["Subject"] = "Password Reset Confirmation"
-        body = f'Click the following link to reset your password: {confirmation_link}'
+        # Convert the confirmation link to bytes
+        confirmation_link_bytes = confirmation_link.encode("utf-8")
+        body = f'Click the following link to reset your password: {confirmation_link_bytes.decode("utf-8")}'
         message.attach(MIMEText(body, "plain"))
         # Establish an SMTP connection and send the email
         try:
@@ -196,57 +283,6 @@ class RecruitmentApp:
             server.quit()
         except Exception as e:
             st.error(f"Error sending confirmation email: {str(e)}")
-
-    def generate_confirmation_link(self, email):
-        # Generate a unique token based on the user's email and current timestamp
-        token = hashlib.md5((email + str(time.time())).encode()).hexdigest()
-        # Construct the confirmation link with the token
-        confirmation_link = f"http://localhost:8501/reset_password?token={token}"
-        return confirmation_link
-    
-    # def register_user(self):
-    #         st.title("User Registration")
-    #         new_username = st.text_input('Username')
-    #         new_password = st.text_input('Password', type='password')
-    #         confirm_password = st.text_input('Confirm Password', type='password')
-    #         new_email = st.text_input('Email')
-    #         is_recruiter = st.checkbox('I am a recruiter')
-    #         show_error = False
-
-    #         # Check if the email already exists
-    #         email_already_exists = check_email_exists(new_email)
-            
-    #         if st.button('Register', key="register_button"):
-    #             # Convert email to lowercase
-    #             new_email = new_email.lower()
-    #             # Validate email
-    #             if not self.is_valid_email(new_email):
-    #                 st.error("Please enter a valid email address")
-    #                 show_error = True
-    #             # Validate password
-    #             if not self.is_valid_password(new_password):
-    #                 st.error("Password must be at least 8 characters with at least one uppercase letter, one lowercase letter, and one digit")
-    #                 show_error = True
-    #             # Check if passwords match
-    #             if new_password != confirm_password:
-    #                 st.error("Passwords do not match")
-    #                 show_error = True
-    #             # if email_already_exists:
-    #             #     # Display the "Reset Password" button if the email already exists
-    #             #     st.warning("This email is already registered. You can reset your password.")
-    #             #     if st.button("Reset Password"):
-    #             #         # Implement the password reset functionality here
-    #             #         self.reset_password()
-    #             elif not show_error:
-    #                 registration = add_user(new_username, new_email, new_password, is_recruiter)
-    #                 if registration:
-    #                     st.success('Registration successful! You can now log in.')
-    #                     self.session_state['user'] = new_username
-    #                     self.save_session_state()
-    #                     st.rerun()
-    #         else:
-    #             if show_error:
-    #                 st.error("Please correct the errors in the form")
 
     
     def update_user_data(self, user_id, profile_picture, cv):
@@ -437,23 +473,21 @@ if __name__ == "__main__":
     app.check_session_timeout()
     if selected_option == "Reset Password":
         app.reset_password()
-    if selected_option == "Home":
+        app.change_password_with_token()
+        
+    elif selected_option == "Home":
         st.title("Welcome to Your Recruitment Platform")
-        st.write("Browse the latest job listings below:")
+        st.write("Browse the latest job listings below:")    
         # Display job listings here
-
     elif selected_option == "Search Jobs":
         st.title("Search for Jobs")
         # Implement your job search functionality
-
     elif selected_option == "Login":
         app.login_user()
     elif selected_option == "Register":
         app.register_user()
-
     elif selected_option == "Change Password":
         app.show_change_password()
-
     elif selected_option == "User Profile":
         app.show_user_profile()
     elif selected_option == "Log Out":
