@@ -24,12 +24,10 @@ def create_database(conn, cursor):
         CREATE TABLE IF NOT EXISTS JobOffers (
             job_id INTEGER PRIMARY KEY,
             recruiter_id INTEGER NOT NULL,
-            offer_path TEXT NOT NULL,
-            name_offer TEXT NOT NULL,
             title TEXT NOT NULL,
+            company TEXT NOT NULL,
             description TEXT NOT NULL,
             location TEXT NOT NULL,
-            salary REAL,
             FOREIGN KEY (recruiter_id) REFERENCES Candidats (user_id)
         )
     ''')
@@ -67,11 +65,11 @@ def add_user(username, email_address, password, is_recruiter):
 # Helper function to save a job offer
 
 
-def save_job_offer(recruiter_id, offer_path, name_offer, title, description, location, salary):
+def save_job_offer(recruiter_id, title, description, location, company):
     conn = sqlite3.connect('recruitment.db')
     cursor = conn.cursor()
-    cursor.execute('INSERT INTO JobOffers (recruiter_id, offer_path, name_offer, title, description, location, salary) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                   (recruiter_id, offer_path, name_offer, title, description, location, salary))
+    cursor.execute('INSERT INTO JobOffers (recruiter_id,  title, description, location,company) VALUES (?, ?, ?, ?,?)',
+                   (recruiter_id, title, description, location,company))
     conn.commit()
     conn.close()
 
@@ -125,6 +123,18 @@ def get_uploaded_candidate_files(u_id):
     profile_picture_path = user_files[0]
     cv_path = user_files[1]
     return profile_picture_path, cv_path
+
+
+def fetch_recruiter_data(recruiter_id):
+    conn = sqlite3.connect('recruitment.db')  # Modify the database path if needed
+    cursor = conn.cursor()
+    # Execute SQL queries to retrieve the recruiter's profile picture and job offer
+    cursor.execute("SELECT profile_picture FROM Candidats WHERE user_id = ? and is_recruiter=True", (recruiter_id,))
+    profile_picture = cursor.fetchone()[0]
+    #cursor.execute("SELECT * FROM JobOffers WHERE recruiter_id = ?", (recruiter_id,))
+    #job_offer = cursor.fetchall()
+    return profile_picture
+
 
 
 # Helper function to save a user's CV path
