@@ -257,7 +257,7 @@ class RecruitmentApp:
                     f.write(cv.read())
                 save_cv_path(cv_path, user_id)
 
-    def update_recruiter_data(self, user_id, profile_picture, job_offer):
+    def update_recruiter_data(self, user_id, profile_picture, title, description, location, company):
         if profile_picture:
             profile_picture_path = os.path.join(
                 f"static/data/user_{user_id}/profile_picture/{user_id}.jpg")
@@ -265,13 +265,8 @@ class RecruitmentApp:
             with open(profile_picture_path, "wb") as f:
                 f.write(profile_picture.read())
             save_profile_picture(profile_picture_path, user_id)
-        if job_offer:
-            job_offer_path = os.path.join(
-                f"static/data/user_{user_id}/offres/{user_id}.pdf")
-            os.makedirs(os.path.dirname(job_offer_path), exist_ok=True)
-            with open(job_offer_path, "wb") as f:
-                f.write(job_offer.read())
-            save_job_offer(user_id, job_offer, name_offer, title, description, location, salary )
+        if title and description and location and company:
+            save_job_offer(user_id, title, description, location, company)
 
     def show_user_profile(self):
         self.last_activity = time.time()
@@ -281,22 +276,13 @@ class RecruitmentApp:
             user_data = fetch_user_data(user_id)
             if user_data[4]:
                 u_id, username, email = user_data[0], user_data[1], user_data[3]
-                pic_path, cv_path = get_uploaded_candidate_files(u_id)
+                print(fetch_recruiter_data(u_id))
+                pic_path= fetch_recruiter_data(u_id)
                 st.write(f"Username: {username}")
                 st.write(f"Email: {email}")
-                st.header("You picture")
+                st.header("Your picture")
                 if pic_path:
                     st.image(pic_path, caption="Profile Picture", width=300)
-                st.header("You CV")
-                if cv_path:
-                    with open(cv_path, 'rb') as pdf_file:
-                        pdf_bytes = pdf_file.read()
-                    st.download_button(
-                        label="Download PDF",
-                        data=pdf_bytes,
-                        key="pdf_download_button",
-                        file_name=(f"{email}.pdf"),
-                    )
                 st.header("Edit Profile")
                 uploaded_profile_picture = st.file_uploader(
                     "Upload Profile Picture (max size: 5 MB)",
@@ -312,23 +298,17 @@ class RecruitmentApp:
                     else:
                         # Process the file
                         st.success("Profile picture uploaded successfully.")
-                uploaded_cv = st.file_uploader(
-                    "Upload CV (PDF) (max size: 10 MB)",
-                    type=["pdf"],
-                    key="cv_uploader",
-                    accept_multiple_files=False
-                )
-                if uploaded_cv:
-                    # Check the file size
-                    if len(uploaded_cv.getvalue()) > 10 * 1024 * 1024:  # 10 MB limit
-                        st.error(
-                            "File size exceeds the allowed limit (10 MB). Please upload a smaller file.")
-                    else:
-                        # Process the file
-                        st.success("CV uploaded successfully.")
+
+
+                title = st.text_input('Title')
+                company = st.text_input('Company')
+                location = st.text_input('Location')
+                description = st.text_input('Description')
+
+
                 if st.button("Save Changes"):
-                    self.update_user_data(
-                        u_id, uploaded_profile_picture, uploaded_cv)
+                    self.update_recruiter_data(
+                        u_id, uploaded_profile_picture, title, company, location, description)
                     st.success("Changes saved successfully!")
                     st.rerun()
             else:
@@ -417,6 +397,16 @@ class RecruitmentApp:
             else:
                 st.error("Current password is incorrect.")
 
+    def fetch_job_offers(self):
+        conn = sqlite3.connect('recruitment.db')  # Modify the database path if needed
+        cursor = conn.cursor()
+
+        # Execute an SQL query to retrieve job offers
+        cursor.execute("SELECT title, company, location, description FROM JobOffers")
+        job_offers = cursor.fetchall()
+        conn.close()
+        return job_offers
+
 
 if __name__ == "__main__":
     app = RecruitmentApp()
@@ -427,8 +417,22 @@ if __name__ == "__main__":
         app.reset_password()
     elif selected_option == "Home":
         st.title("Welcome to Your Recruitment Platform")
-        st.write("Browse the latest job listings below:")    
+        st.write("Browse the latest job listings below:")
+
         # Display job listings here
+        job_offers = app.fetch_job_offers()
+
+        if not job_offers:
+            st.write("No job offers available at the moment.")
+        else:
+            # Display job offers in a table or list format
+            st.subheader("Job Offers")
+            for job_offer in job_offers:
+                st.write(f"**Job Title:** {job_offer[0]}")
+                st.write(f"**Company:** {job_offer[1]}")
+                st.write(f"**Location:** {job_offer[2]}")
+                st.write(f"**Description:** {job_offer[3]}")
+
     elif selected_option == "Search Jobs":
         st.title("Search for Jobs")
         # Implement your job search functionality
