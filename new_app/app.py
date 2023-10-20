@@ -5,6 +5,7 @@ from flask import Flask, render_template, request
 import streamlit.components.v1 as components
 from streamlit_app.utils import get_user_email_from_token, update_user_password
 
+
 app = Flask(__name__)
 
 # Your Flask routes and views go here...
@@ -38,8 +39,8 @@ def reset_password():
         # Handle the POST request to reset the password
         token = request.form.get('token')
         print("the token",token)
-        new_password = request.form.get('password')
-        confirm_password = request.form.get('confirm-password')
+        new_password = is_valid_password(request.form.get('password'))
+        confirm_password = is_valid_password(request.form.get('confirm-password'))
         # Check if the passwords match and other validation logic
         if new_password != confirm_password:
             return "Passwords do not match. Please try again."

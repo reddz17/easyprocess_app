@@ -81,15 +81,12 @@ class RecruitmentApp:
                                 'house', 'lightbulb', 'star', 'person', 'gear'], menu_icon="cast", default_index=0)
         return selected
 
-   
-    
     def login_user(self):
         st.title("User Login")
         email = st.text_input('Email').lower()
         password = st.text_input('Password', type='password')
         if st.button('Login', key="login_button"):
             user = authenticate_user(email, password)
-            print(user)
             if user:
                 st.success('Login successful!')
                 # Store the username in the session
@@ -152,7 +149,7 @@ class RecruitmentApp:
                 registration = add_user(new_username, new_email, new_password, is_recruiter)
                 if registration:
                     st.success('Registration successful! You can now log in.')
-                    self.session_state['user'] = new_username
+                    self.session_state['user'] = fetch_user_data_mail(new_email)
                     self.save_session_state()
                     st.rerun()
                 else:
@@ -168,12 +165,9 @@ class RecruitmentApp:
         if st.button("Reset Password", key="reset_password_button"):
             user_data = fetch_user_data_mail(reset_email)
             if user_data:
-                print(self.generate_confirmation_link(reset_email)[1])
                 confirmation_link,token = self.generate_confirmation_link(reset_email)
                 update_token_user(token,reset_email)
-                print("confirmation link line 174",confirmation_link)
                 self.send_reset_password_email(reset_email, confirmation_link)  # Send the reset password email
-                print("confirmation link line 176",confirmation_link)
                 st.success("Password reset confirmation email sent. Please check your email.")
             else:
                 st.error("Email not found. Please enter a registered email address.")
@@ -191,11 +185,9 @@ class RecruitmentApp:
         message["From"] = sender_email
         message["To"] = recipient_email
         message["Subject"] = "Password Reset Request"
-        print("sender mail before body Line 194",reset_link)
         # Email body
         email_body = f"Click the following link to reset your password: {reset_link}"
         message.attach(MIMEText(email_body, "plain"))
-        print("sender mail after body",reset_link)
         # Connect to the SMTP server and send the email
         try:
             server = smtplib.SMTP(smtp_server, smtp_port)
@@ -286,9 +278,7 @@ class RecruitmentApp:
         st.title("User Profile")
         if self.session_state['user']:
             user_id = self.session_state['user']
-            print(user_id)
             user_data = fetch_user_data(user_id)
-            print(user_data)
             if user_data[4]:
                 u_id, username, email = user_data[0], user_data[1], user_data[3]
                 pic_path, cv_path = get_uploaded_candidate_files(u_id)
