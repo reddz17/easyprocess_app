@@ -5,10 +5,13 @@ from flask import Flask, render_template, request
 import streamlit.components.v1 as components
 from streamlit_app.utils import get_user_email_from_token, update_user_password
 
-
 app = Flask(__name__)
 
 # Your Flask routes and views go here...
+def is_valid_password(password):
+    return len(password)>=12 and any(c.isupper() for c in password)and\
+            any(c.islower() for c in password) and any(c.isdigit() for c in password) 
+
 
 @app.route('/')
 def index():
@@ -26,32 +29,32 @@ def forgot_password():
 
 @app.route('/reset_password', methods=['GET', 'POST'])
 def reset_password():
+    token = request.args.get('token')
+    error_message = ""  # Initialize error_message
+    success_message = ""  # Initialize success_message
     if request.method == 'GET':
-        # Handle the GET request (e.g., show a form to input a new password)
-        # Extract the token from the URL
-        token = request.args.get('token')
-        if token:
-            # Process the token and show the password reset form
-            return render_template('reset_password_form.html', token=token)
-        else:
+        if not token:
             return "Invalid or missing token in the URL."
+        return render_template('reset_password_form.html', token=token)
     elif request.method == 'POST':
-        # Handle the POST request to reset the password
         token = request.form.get('token')
-        print("the token",token)
-        new_password = is_valid_password(request.form.get('password'))
-        confirm_password = is_valid_password(request.form.get('confirm-password'))
-        # Check if the passwords match and other validation logic
+        new_password = request.form.get('password')
+        confirm_password = request.form.get('confirm-password')
         if new_password != confirm_password:
-            return "Passwords do not match. Please try again."
-        # Implement the logic to update the user's password with the new one
-        user_email = get_user_email_from_token(token)  # Implement this function
-        if user_email:
-            # Update the password in the database for the user with this email
-            print(user_email,new_password)
-            update_user_password(user_email, new_password)
-        # Once the password is reset, you can return a success message or redirect the user to a login page
-        return "Password reset successful!"  # You can replace this with a redirect
+            error_message = "Passwords do not match. Please try again."
+        elif not is_valid_password(new_password):
+            error_message = "Password does not meet the required criteria."
+        else:
+            user_email = get_user_email_from_token(token)
+            if user_email:
+                update_user_password(user_email, new_password)
+                success_message = "Password reset successful! You can now log in with your new password."
+                return render_template('success.html', token=token, error_message=error_message, success_message=success_message)
+            else:
+                error_message = "Invalid token. Please check and try again."
+        return render_template('reset_password_form.html', token=token, error_message=error_message, success_message=success_message)
+
+
 
 @app.route('/password_reset_success')
 def password_reset_success():
