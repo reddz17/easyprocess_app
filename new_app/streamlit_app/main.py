@@ -298,14 +298,10 @@ class RecruitmentApp:
                     else:
                         # Process the file
                         st.success("Profile picture uploaded successfully.")
-
-
                 title = st.text_input('Title')
                 company = st.text_input('Company')
                 location = st.text_input('Location')
-                description = st.text_input('Description')
-
-
+                description = st.text_area('Description')
                 if st.button("Save Changes"):
                     self.update_recruiter_data(
                         u_id, uploaded_profile_picture, title, company, location, description)
@@ -397,15 +393,7 @@ class RecruitmentApp:
             else:
                 st.error("Current password is incorrect.")
 
-    def fetch_job_offers(self):
-        conn = sqlite3.connect('recruitment.db')  # Modify the database path if needed
-        cursor = conn.cursor()
 
-        # Execute an SQL query to retrieve job offers
-        cursor.execute("SELECT title, company, location, description FROM JobOffers")
-        job_offers = cursor.fetchall()
-        conn.close()
-        return job_offers
 
 
 if __name__ == "__main__":
@@ -418,24 +406,50 @@ if __name__ == "__main__":
     elif selected_option == "Home":
         st.title("Welcome to Your Recruitment Platform")
         st.write("Browse the latest job listings below:")
-
         # Display job listings here
-        job_offers = app.fetch_job_offers()
-
+        job_offers = fetch_job_offers()
         if not job_offers:
-            st.write("No job offers available at the moment.")
+            st.write("No job offers match your search.")
         else:
-            # Display job offers in a table or list format
-            st.subheader("Job Offers")
-            for job_offer in job_offers:
-                st.write(f"**Job Title:** {job_offer[0]}")
-                st.write(f"**Company:** {job_offer[1]}")
-                st.write(f"**Location:** {job_offer[2]}")
-                st.write(f"**Description:** {job_offer[3]}")
-
+            st.subheader("Search Results")
+            for index, job_offer in enumerate(job_offers, start=1):
+                # Utilisez st.expander pour créer des sections expansibles pour chaque offre d'emploi
+                with st.expander(f"Job Offer #{index} - {job_offer[0]}"):
+                    st.write(f"**Job Title:** {job_offer[0]}")
+                    st.write(f"**Company:** {job_offer[1]}")
+                    st.write(f"**Location:** {job_offer[2]}")
+                    st.write(f"**Description:** {job_offer[3]}")
     elif selected_option == "Search Jobs":
         st.title("Search for Jobs")
-        # Implement your job search functionality
+        search_term = st.text_input("Enter job search term:")
+            # Si le bouton de recherche est cliqué
+        if st.button("Search"):
+            # Récupérez les offres d'emploi filtrées en fonction du terme de recherche
+            job_offers = fetch_job_offers(search_term)
+            # Affichez les résultats de la recherche
+            if not job_offers:
+                st.write("No job offers match your search.")
+            else:
+                st.subheader("Search Results")
+                for index, job_offer in enumerate(job_offers, start=1):
+                    # Utilisez st.expander pour créer des sections expansibles pour chaque offre d'emploi
+                    with st.expander(f"Job Offer #{index} - {job_offer[0]}"):
+                        st.write(f"**Job Title:** {job_offer[0]}")
+                        st.write(f"**Company:** {job_offer[1]}")
+                        st.write(f"**Location:** {job_offer[2]}")
+                        st.write(f"**Description:** {job_offer[3]}")
+                         # Ajoutez un bouton pour permettre aux candidats de postuler
+                        apply_button = st.button(f"Apply for Job #{index}", key=f"apply_button_{index}")
+                        user_id = app.session_state['user']
+                        print(f"Line 444------- {user_id}")
+                        if apply_button:
+                            # Enregistrez le CV dans un emplacement spécifique (vous pouvez adapter cela selon votre structure)
+                            cv_path = get_cv_path(user_id)
+                            print(f"Line 444 ----------- {cv_path}")
+                            # Enregistrez les informations de candidature dans la base de données
+                            save_application(user_id, job_offer[0], cv_path)
+                            st.success("Application submitted successfully!")
+                    # Implement your job search functionality
     elif selected_option == "Login":
         app.login_user()
     elif selected_option == "Register":
