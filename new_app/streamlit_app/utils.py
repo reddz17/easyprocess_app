@@ -27,6 +27,8 @@ def create_database(conn, cursor):
             title TEXT NOT NULL,
             company TEXT NOT NULL,
             description TEXT NOT NULL,
+            experience TEXT NOT NULL,
+            mode TEXT NOT NULL,
             location TEXT NOT NULL,
             FOREIGN KEY (recruiter_id) REFERENCES Users (user_id)
         )
@@ -65,11 +67,11 @@ def add_user(username, email_address, password, is_recruiter):
 # Helper function to save a job offer
 
 
-def save_job_offer(recruiter_id, title, description, location, company):
+def save_job_offer(recruiter_id, title, description, location, experience, mode, company):
     conn = sqlite3.connect('recruitment.db')
     cursor = conn.cursor()
-    cursor.execute('INSERT INTO JobOffers (recruiter_id,  title, description, location,company) VALUES (?, ?, ?, ?,?)',
-                   (recruiter_id, title, description, location,company))
+    cursor.execute('INSERT INTO JobOffers (recruiter_id,  title, description, location, experience, mode, company) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                   (recruiter_id, title, description, location, experience, mode, company))
     conn.commit()
     conn.close()
 

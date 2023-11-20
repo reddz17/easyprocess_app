@@ -257,7 +257,7 @@ class RecruitmentApp:
                     f.write(cv.read())
                 save_cv_path(cv_path, user_id)
 
-    def update_recruiter_data(self, user_id, profile_picture, title, description, location, company):
+    def update_recruiter_data(self, user_id, profile_picture, title, company, location, experience, mode, description):
         if profile_picture:
             profile_picture_path = os.path.join(
                 f"static/data/user_{user_id}/profile_picture/{user_id}.jpg")
@@ -265,8 +265,8 @@ class RecruitmentApp:
             with open(profile_picture_path, "wb") as f:
                 f.write(profile_picture.read())
             save_profile_picture(profile_picture_path, user_id)
-        if title and description and location and company:
-            save_job_offer(user_id, title, description, location, company)
+        if title and company and location and experience and mode and description :
+            save_job_offer(user_id, title, company, location, experience, mode, description)
 
     def show_user_profile(self):
         self.last_activity = time.time()
@@ -301,10 +301,14 @@ class RecruitmentApp:
                 title = st.text_input('Title')
                 company = st.text_input('Company')
                 location = st.text_input('Location')
-                description = st.text_area('Description')
+                experience = st.text_input('Years of experience')
+                mode = st.text_input('Work Arrangement')
+                description = st.text_input('Description')
+
+
                 if st.button("Save Changes"):
                     self.update_recruiter_data(
-                        u_id, uploaded_profile_picture, title, company, location, description)
+                        u_id, uploaded_profile_picture, title, company, location, experience, mode, description)
                     st.success("Changes saved successfully!")
                     st.rerun()
             else:
@@ -312,10 +316,10 @@ class RecruitmentApp:
                 pic_path, cv_path = get_uploaded_candidate_files(u_id)
                 st.write(f"Username: {username}")
                 st.write(f"Email: {email}")
-                st.header("You picture")
+                st.header("Your picture")
                 if pic_path:
                     st.image(pic_path, caption="Profile Picture", width=300)
-                st.header("You CV")
+                st.header("Your CV")
                 if cv_path:
                     with open(cv_path, 'rb') as pdf_file:
                         pdf_bytes = pdf_file.read()
@@ -394,6 +398,11 @@ class RecruitmentApp:
                 st.error("Current password is incorrect.")
 
 
+        # Execute an SQL query to retrieve job offers
+        cursor.execute("SELECT title, company, location, experience, mode, description FROM JobOffers")
+        job_offers = cursor.fetchall()
+        conn.close()
+        return job_offers
 
 
 if __name__ == "__main__":
@@ -406,19 +415,34 @@ if __name__ == "__main__":
     elif selected_option == "Home":
         st.title("Welcome to Your Recruitment Platform")
         st.write("Browse the latest job listings below:")
+
+        # Add a container to hold the job offers section
+        job_offers_container = st.container()
+
         # Display job listings here
         job_offers = fetch_job_offers()
         if not job_offers:
-            st.write("No job offers match your search.")
+            job_offers_container.error("No job offers available at the moment.")
         else:
-            st.subheader("Search Results")
-            for index, job_offer in enumerate(job_offers, start=1):
-                # Utilisez st.expander pour créer des sections expansibles pour chaque offre d'emploi
-                with st.expander(f"Job Offer #{index} - {job_offer[0]}"):
-                    st.write(f"**Job Title:** {job_offer[0]}")
-                    st.write(f"**Company:** {job_offer[1]}")
-                    st.write(f"**Location:** {job_offer[2]}")
-                    st.write(f"**Description:** {job_offer[3]}")
+            # Display job offers in a more visually appealing format
+            job_offers_container.subheader("Job Offers")
+            for job_offer in job_offers:
+                with job_offers_container:
+                    st.markdown(
+                        f"""
+                        <div style="background-color: #f5f5f5; padding: 20px; margin-bottom: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);">
+                            <h3>{job_offer[0]}</h3>
+                            <p><strong>Company:</strong> {job_offer[5]}</p>
+                            <p><strong>Location:</strong> {job_offer[2]}</p>
+                            <p><strong>Experience:</strong> {job_offer[3]}</p>
+                            <p><strong>Mode:</strong> {job_offer[4]}</p>
+                            <p><strong>Description:</strong> {job_offer[1]}</p>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+
+
     elif selected_option == "Search Jobs":
         st.title("Search for Jobs")
         search_term = st.text_input("Enter job search term:")
