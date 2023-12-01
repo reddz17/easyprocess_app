@@ -426,7 +426,7 @@ if __name__ == "__main__":
         else:
             # Display job offers in a more visually appealing format
             job_offers_container.subheader("Job Offers")
-            for job_offer in job_offers:
+            for index, job_offer in enumerate(job_offers, start=1):
                 with job_offers_container:
                     st.markdown(
                         f"""
@@ -441,7 +441,15 @@ if __name__ == "__main__":
                         """,
                         unsafe_allow_html=True
                     )
-
+                    apply_button = st.button(f"Apply for Job #{index}", key=f"apply_button_{index}")
+                    user_id = app.session_state['user']
+                    if apply_button:
+                        # Enregistrez le CV dans un emplacement spécifique (vous pouvez adapter cela selon votre structure)
+                        cv_path = get_cv_path(user_id)
+                        print(f"Line 444 ----------- {cv_path}")
+                        # Enregistrez les informations de candidature dans la base de données
+                        save_application(user_id, job_offer[0], cv_path)
+                        st.success("Application submitted successfully!")
 
     elif selected_option == "Search Jobs":
         st.title("Search for Jobs")
@@ -459,9 +467,12 @@ if __name__ == "__main__":
                     # Utilisez st.expander pour créer des sections expansibles pour chaque offre d'emploi
                     with st.expander(f"Job Offer #{index} - {job_offer[0]}"):
                         st.write(f"**Job Title:** {job_offer[0]}")
-                        st.write(f"**Company:** {job_offer[1]}")
+                        st.write(f"**Company:** {job_offer[3]}")
                         st.write(f"**Location:** {job_offer[2]}")
-                        st.write(f"**Description:** {job_offer[3]}")
+                        st.write(f"**Description:** {job_offer[1]}")
+                        st.write(f"**Mode:** {job_offer[5]}")
+                        st.write(f"**Experience:** {job_offer[4]}")
+
                          # Ajoutez un bouton pour permettre aux candidats de postuler
                         apply_button = st.button(f"Apply for Job #{index}", key=f"apply_button_{index}")
                         user_id = app.session_state['user']

@@ -1,6 +1,6 @@
+# command flask --app app.py --debug run
 import sys
 sys.path.append('/d/HETIC/Mastère 2/projet entreprenaria/easyprocess_app/new_app')
-
 from flask import Flask, render_template, request
 import streamlit.components.v1 as components
 from streamlit_app.utils import get_user_email_from_token, update_user_password
@@ -54,16 +54,30 @@ def reset_password():
                 error_message = "Invalid token. Please check and try again."
         return render_template('reset_password_form.html', token=token, error_message=error_message, success_message=success_message)
 
+@app.route('/home')
+def home():
+    # Render the home.html template
+    return render_template('home.html')
 
+@app.route('/login')
+def login():
+    # Render the login.html template
+    return render_template('login.html')
 
-@app.route('/password_reset_success')
-def password_reset_success():
-    # You can create an HTML template for a success message
-    # or simply return a success message here
-    return "Password reset successful. You can now log in with your new password."
+@app.route('/register')
+def register():
+    # Render the register.html template
+    return render_template('register.html')
 
+@app.route('/change_password')
+def change_password():
+    # Render the change_password.html template
+    return render_template('change_password.html')
+
+@app.route('/user_profile')
+def user_profile():
+    # Render the user_profile.html template
+    return render_template('user_profile.html')
 
 if __name__ == '__main__':
     app.run(debug=True)
-
-

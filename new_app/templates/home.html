@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Your App{% endblock %}</title>
+    <!-- Add your CSS styles or link to external stylesheets here -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+<nav>
+    <ul>
+        <li><a href="{{ url_for('home') }}">Home</a></li>
+        <li><a href="{{ url_for('login') }}">Login</a></li>
+        <li><a href="{{ url_for('register') }}">Register</a></li>
+        <li><a href="{{ url_for('change_password') }}">Change Password</a></li>
+        <li><a href="{{ url_for('user_profile') }}">User Profile</a></li>
+        <!-- Add more navigation links as needed -->
+    </ul>
+</nav>
+
+<div>
+    {% block content %}{% endblock %}
+</div>
+
+</body>
+</html>

@@ -2,7 +2,6 @@ import sqlite3
 from passlib.hash import pbkdf2_sha256
 from datetime import datetime
 
-
 def create_database(conn, cursor):
     # Create the database tables if they don't exist
     # Connect to the database
@@ -12,9 +11,9 @@ def create_database(conn, cursor):
         CREATE TABLE IF NOT EXISTS Users (
             user_id INTEGER PRIMARY KEY,
             username TEXT NOT NULL,
-            password TEXT NOT NULL,
+            password_hash TEXT NOT NULL,  -- Use a secure hash function to store passwords
             email_address TEXT UNIQUE NOT NULL,
-            is_recruiter BOOLEAN NOT NULL,
+            is_recruiter INTEGER NOT NULL,  -- Use INTEGER instead of BOOLEAN
             profile_picture TEXT,
             cv_path TEXT,
             reset_token TEXT
@@ -31,6 +30,17 @@ def create_database(conn, cursor):
             mode TEXT NOT NULL,
             location TEXT NOT NULL,
             FOREIGN KEY (recruiter_id) REFERENCES Users (user_id)
+        )
+    ''')
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS Quiz (
+            quiz_id INTEGER PRIMARY KEY,  -- Assuming quiz_id is unique for each quiz
+            job_id INTEGER NOT NULL,
+            candidate_id INTEGER NOT NULL,
+            name_quiz TEXT NOT NULL,
+            result_quiz INTEGER NOT NULL,  -- Assuming the result is a percentage (e.g., 90)
+            FOREIGN KEY (job_id) REFERENCES JobOffers (job_id),
+            FOREIGN KEY (candidate_id) REFERENCES Users (user_id)
         )
     ''')
     cursor.execute('''
@@ -102,7 +112,7 @@ def fetch_user_data_mail(email):
     conn.close()
     return user_id[0] if user_id else None
 
-def save_profile_picture(profile_picture_path, user_id):
+def save_profile_picture(profile_picture_E, user_id):
     conn = sqlite3.connect('recruitment.db')
     cursor = conn.cursor()
     try:
@@ -189,9 +199,9 @@ def fetch_job_offers(search_term=None):
     cursor = conn.cursor()
     # Construisez la requête SQL en fonction du terme de recherche
     if search_term:
-        query = f"SELECT title, company, location, description FROM JobOffers WHERE title LIKE '%{search_term}%' OR company LIKE '%{search_term}%' OR description LIKE '%{search_term}%'"
+        query = f"SELECT title, company, location, description, experience, mode FROM JobOffers WHERE title LIKE '%{search_term}%' OR company LIKE '%{search_term}%' OR description LIKE '%{search_term}%'"
     else:
-        query = "SELECT title, company, location, description FROM JobOffers"
+        query = "SELECT title, company, location, description, experience, mode FROM JobOffers"
     # Exécutez la requête SQL pour récupérer les offres d'emploi
     cursor.execute(query)
     job_offers = cursor.fetchall()
