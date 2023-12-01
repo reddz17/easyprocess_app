@@ -12,7 +12,10 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import hashlib
 from env import ENV_PASSWORD, ENV_EMAIL
+from dotenv import load_dotenv
 
+
+load_dotenv()
 class RecruitmentApp:
     def __init__(self):
         # Create or connect to the SQLite database
@@ -23,7 +26,8 @@ class RecruitmentApp:
         self.initialize_session_state()
         self.last_activity = time.time()  # Initialize last activity time
         self.SESSION_TIMEOUT = 60
-        self.token_lifetime = 3600 
+        self.token_lifetime = 3600
+        
         
         
         
@@ -243,7 +247,7 @@ class RecruitmentApp:
         if self.session_state['user']:
             if profile_picture:
                 profile_picture_path = os.path.join(
-                    f"static/data/user_{user_id}/profile_picture/{user_id}.jpg")
+                    f"{os.getenv('profile_path')}{user_id}.jpg")
                 os.makedirs(os.path.dirname(
                     profile_picture_path), exist_ok=True)
                 with open(profile_picture_path, "wb") as f:
@@ -251,7 +255,7 @@ class RecruitmentApp:
                 save_profile_picture(profile_picture_path, user_id)
             if cv:
                 cv_path = os.path.join(
-                    f"static/data/user_{user_id}/CV/{user_id}_cv.pdf")
+                    f"{os.getenv('cv_path')}{user_id}_cv.pdf")
                 os.makedirs(os.path.dirname(cv_path), exist_ok=True)
                 with open(cv_path, "wb") as f:
                     f.write(cv.read())
@@ -260,7 +264,7 @@ class RecruitmentApp:
     def update_recruiter_data(self, user_id, profile_picture, title, company, location, experience, mode, description):
         if profile_picture:
             profile_picture_path = os.path.join(
-                f"static/data/user_{user_id}/profile_picture/{user_id}.jpg")
+                f"{os.getenv('profile_path')}{user_id}.jpg")
             os.makedirs(os.path.dirname(profile_picture_path), exist_ok=True)
             with open(profile_picture_path, "wb") as f:
                 f.write(profile_picture.read())
@@ -303,7 +307,7 @@ class RecruitmentApp:
                 location = st.text_input('Location')
                 experience = st.text_input('Years of experience')
                 mode = st.text_input('Work Arrangement')
-                description = st.text_input('Description')
+                description = st.text_area('Description')
 
 
                 if st.button("Save Changes"):
@@ -415,10 +419,9 @@ if __name__ == "__main__":
     elif selected_option == "Home":
         st.title("Welcome to Your Recruitment Platform")
         st.write("Browse the latest job listings below:")
-
+        user_id = app.session_state['user']
         # Add a container to hold the job offers section
         job_offers_container = st.container()
-
         # Display job listings here
         job_offers = fetch_job_offers()
         if not job_offers:
@@ -426,23 +429,31 @@ if __name__ == "__main__":
         else:
             # Display job offers in a more visually appealing format
             job_offers_container.subheader("Job Offers")
-            for job_offer in job_offers:
+            for index, job_offer in enumerate(job_offers, start=1):
                 with job_offers_container:
+                    pic_path= fetch_recruiter_data(user_id)
                     st.markdown(
                         f"""
                         <div style="background-color: #f5f5f5; padding: 20px; margin-bottom: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);">
                             <h3>{job_offer[0]}</h3>
-                            <p><strong>Company:</strong> {job_offer[5]}</p>
+                            <p><strong>Company:</strong> {job_offer[3]}</p>
                             <p><strong>Location:</strong> {job_offer[2]}</p>
-                            <p><strong>Experience:</strong> {job_offer[3]}</p>
-                            <p><strong>Mode:</strong> {job_offer[4]}</p>
+                            <p><strong>Experience:</strong> {job_offer[4]}</p>
+                            <p><strong>Mode:</strong> {job_offer[5]}</p>
                             <p><strong>Description:</strong> {job_offer[1]}</p>
                         </div>
                         """,
                         unsafe_allow_html=True
                     )
-
-
+                    apply_button = st.button(f"Apply for Job #{index}", key=f"apply_button_{index}")
+                    if apply_button:
+                        print(f"Line 447 ----------- {user_id}")
+                        # Enregistrez le CV dans un emplacement spécifique (vous pouvez adapter cela selon votre structure)
+                        cv_path = get_cv_path(user_id)
+                        print(f"Line 450 ----------- {cv_path}")
+                        # Enregistrez les informations de candidature dans la base de données
+                        save_application(user_id, job_offer[0], cv_path)
+                        st.success("Application submitted successfully!")
     elif selected_option == "Search Jobs":
         st.title("Search for Jobs")
         search_term = st.text_input("Enter job search term:")
@@ -459,17 +470,20 @@ if __name__ == "__main__":
                     # Utilisez st.expander pour créer des sections expansibles pour chaque offre d'emploi
                     with st.expander(f"Job Offer #{index} - {job_offer[0]}"):
                         st.write(f"**Job Title:** {job_offer[0]}")
-                        st.write(f"**Company:** {job_offer[1]}")
+                        st.write(f"**Company:** {job_offer[3]}")
                         st.write(f"**Location:** {job_offer[2]}")
-                        st.write(f"**Description:** {job_offer[3]}")
+                        st.write(f"**Description:** {job_offer[1]}")
+                        st.write(f"**Mode:** {job_offer[5]}")
+                        st.write(f"**Experience:** {job_offer[4]}")
                          # Ajoutez un bouton pour permettre aux candidats de postuler
                         apply_button = st.button(f"Apply for Job #{index}", key=f"apply_button_{index}")
                         user_id = app.session_state['user']
-                        print(f"Line 444------- {user_id}")
+                        print(f"Line 479------- {user_id}")
                         if apply_button:
+                            print(f"Line 481------- {user_id}")
                             # Enregistrez le CV dans un emplacement spécifique (vous pouvez adapter cela selon votre structure)
                             cv_path = get_cv_path(user_id)
-                            print(f"Line 444 ----------- {cv_path}")
+                            print(f"Line 484 ----------- {cv_path}")
                             # Enregistrez les informations de candidature dans la base de données
                             save_application(user_id, job_offer[0], cv_path)
                             st.success("Application submitted successfully!")

@@ -5,9 +5,6 @@ from datetime import datetime
 
 def create_database(conn, cursor):
     # Create the database tables if they don't exist
-    # Connect to the database
-    conn = sqlite3.connect('recruitment.db')
-    cursor = conn.cursor()
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS Users (
             user_id INTEGER PRIMARY KEY,
@@ -34,19 +31,29 @@ def create_database(conn, cursor):
         )
     ''')
     cursor.execute('''
+        CREATE TABLE IF NOT EXISTS Quiz (
+            quiz_id INTEGER PRIMARY KEY,  -- Assuming quiz_id is unique for each quiz
+            job_id INTEGER NOT NULL,
+            candidate_id INTEGER NOT NULL,
+            name_quiz TEXT NOT NULL,
+            result_quiz INTEGER NOT NULL,  -- Assuming the result is a percentage (e.g., 90)
+            FOREIGN KEY (job_id) REFERENCES JobOffers (job_id),
+            FOREIGN KEY (candidate_id) REFERENCES Users (user_id)
+        )
+    ''')
+    cursor.execute('''
         CREATE TABLE IF NOT EXISTS Applications (
             application_id INTEGER PRIMARY KEY,
             job_id INTEGER NOT NULL,
             candidate_id INTEGER NOT NULL,
+            job_title TEXT NOT NULL,
             application_status TEXT NOT NULL,
             FOREIGN KEY (job_id) REFERENCES JobOffers (job_id),
             FOREIGN KEY (candidate_id) REFERENCES Users (user_id)
         )
     ''')
-    # Commit changes and close the database connection
+    # Commit changes, but keep the connection open if it was passed as a parameter
     conn.commit()
-    conn.close()
-
 # Helper function to add a user
 
 
@@ -71,10 +78,9 @@ def save_job_offer(recruiter_id, title, description, location, experience, mode,
     conn = sqlite3.connect('recruitment.db')
     cursor = conn.cursor()
     cursor.execute('INSERT INTO JobOffers (recruiter_id,  title, description, location, experience, mode, company) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                   (recruiter_id, title, description, location, experience, mode, company))
+                (recruiter_id, title, description, location, experience, mode, company))
     conn.commit()
     conn.close()
-
 
 def change_password(new_hashed_password, user_id):
     conn = sqlite3.connect('recruitment.db')
@@ -82,16 +88,21 @@ def change_password(new_hashed_password, user_id):
     cursor.execute(
         'UPDATE Users SET password = ? WHERE user_id = ?', (new_hashed_password, user_id))
     conn.commit()
-    conn.close
+    conn.close()
 
-
+def get_picture(user_id):
+    conn = sqlite3.connect('recruitment.db')
+    cursor = conn.cursor()
+    cursor.execute(
+        'SELECT user_id, profile_picture FROM Users WHERE user_id = ?', (user_id,))
+    return cursor.fetchone()    
+    
 def fetch_user_data(user_id):
     conn = sqlite3.connect('recruitment.db')
     cursor = conn.cursor()
     cursor.execute(
         'SELECT user_id, username, password, email_address, is_recruiter FROM Users WHERE user_id = ?', (user_id,))
     return cursor.fetchone()
-# Helper function to save a user's profile picture
 
 def fetch_user_data_mail(email):
     conn = sqlite3.connect('recruitment.db')
@@ -189,9 +200,9 @@ def fetch_job_offers(search_term=None):
     cursor = conn.cursor()
     # Construisez la requête SQL en fonction du terme de recherche
     if search_term:
-        query = f"SELECT title, company, location, description FROM JobOffers WHERE title LIKE '%{search_term}%' OR company LIKE '%{search_term}%' OR description LIKE '%{search_term}%'"
+        query = f"SELECT title, company, location, description, experience, mode, location  FROM JobOffers WHERE title LIKE '%{search_term}%' OR company LIKE '%{search_term}%' OR description LIKE '%{search_term}%'"
     else:
-        query = "SELECT title, company, location, description FROM JobOffers"
+        query = "SELECT title, company, location, description, experience, mode, location FROM JobOffers"
     # Exécutez la requête SQL pour récupérer les offres d'emploi
     cursor.execute(query)
     job_offers = cursor.fetchall()
@@ -243,7 +254,7 @@ def save_application(user_id, job_title, cv_path):
     try:
         # Insert the application details into the database
         cursor.execute("""
-            INSERT INTO Applications (user_id, job_title, cv_path)
+            INSERT INTO Applications (candidate_id, job_title, cv_path)
             VALUES (?, ?, ?)
         """, (user_id, job_title, cv_path))
         # Commit the changes to the database
