@@ -73,15 +73,6 @@ def add_user(username, email_address, password, is_recruiter):
 
 # Helper function to save a job offer
 
-
-def save_job_offer(recruiter_id, title, description, location, experience, mode, company):
-    conn = sqlite3.connect('recruitment.db')
-    cursor = conn.cursor()
-    cursor.execute('INSERT INTO JobOffers (recruiter_id,  title, description, location, experience, mode, company) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                (recruiter_id, title, description, location, experience, mode, company))
-    conn.commit()
-    conn.close()
-
 def change_password(new_hashed_password, user_id):
     conn = sqlite3.connect('recruitment.db')
     cursor = conn.cursor()
@@ -89,6 +80,15 @@ def change_password(new_hashed_password, user_id):
         'UPDATE Users SET password = ? WHERE user_id = ?', (new_hashed_password, user_id))
     conn.commit()
     conn.close()
+
+def save_job_offer(recruiter_id, title, description, location, experience, mode, company):
+    conn = sqlite3.connect('recruitment.db')
+    cursor = conn.cursor()
+    cursor.execute('INSERT INTO JobOffers (recruiter_id, title, description, location, experience, mode, company) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                (recruiter_id, title, description, location, experience, mode, company))
+    conn.commit()
+    conn.close()
+
 
 def get_picture(user_id):
     conn = sqlite3.connect('recruitment.db')
@@ -144,8 +144,6 @@ def fetch_recruiter_data(recruiter_id):
     # Execute SQL queries to retrieve the recruiter's profile picture and job offer
     cursor.execute("SELECT profile_picture FROM Users WHERE user_id = ? and is_recruiter=True", (recruiter_id,))
     profile_picture = cursor.fetchone()[0]
-    #cursor.execute("SELECT * FROM JobOffers WHERE recruiter_id = ?", (recruiter_id,))
-    #job_offer = cursor.fetchall()
     return profile_picture
 
 
@@ -185,15 +183,7 @@ def get_cv_path(user_id):
         print(f"Error updating CV path: {e}")
     finally:
         conn.close()
-
-# def fetch_job_offers(self):
-#     conn = sqlite3.connect('recruitment.db')  # Modify the database path if needed
-#     cursor = conn.cursor()
-#     # Execute an SQL query to retrieve job offers
-#     cursor.execute("SELECT title, company, location, description FROM JobOffers")
-#     job_offers = cursor.fetchall()
-#     conn.close()
-#     return job_offers
+        
 
 def fetch_job_offers(search_term=None):
     conn = sqlite3.connect('recruitment.db')  # Modify the database path if needed

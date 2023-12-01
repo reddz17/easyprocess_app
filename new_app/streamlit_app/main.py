@@ -21,7 +21,7 @@ class RecruitmentApp:
         # Create or connect to the SQLite database
         self.conn = sqlite3.connect('recruitment.db')
         self.cursor = self.conn.cursor()
-        self.logo_path = "static/logo/logo.png"
+        self.logo_path = os.getenv("logo_path")
         self.load_session_state()
         self.initialize_session_state()
         self.last_activity = time.time()  # Initialize last activity time
@@ -393,6 +393,7 @@ class RecruitmentApp:
                 st.error("New passwords do not match.")
                 return
             # Print for debugging purposes
+            print(f'hereeeeeee{user_id}')
             if pbkdf2_sha256.verify(current_password,current_hashed_password ):
                 new_hashed_password = pbkdf2_sha256.hash(new_password)
                 self.update_password(user_id, new_hashed_password)
@@ -401,12 +402,6 @@ class RecruitmentApp:
             else:
                 st.error("Current password is incorrect.")
 
-
-        # Execute an SQL query to retrieve job offers
-        cursor.execute("SELECT title, company, location, experience, mode, description FROM JobOffers")
-        job_offers = cursor.fetchall()
-        conn.close()
-        return job_offers
 
 
 if __name__ == "__main__":
