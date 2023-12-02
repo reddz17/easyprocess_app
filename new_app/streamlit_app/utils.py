@@ -47,7 +47,9 @@ def create_database(conn, cursor):
             job_id INTEGER NOT NULL,
             candidate_id INTEGER NOT NULL,
             job_title TEXT NOT NULL,
-            application_status TEXT NOT NULL,
+            cv_path TEXT NOT NULL,
+            company TEXT NOT NULL,
+            application_status TEXT NOT NULL DEFAULT 'En cours',
             FOREIGN KEY (job_id) REFERENCES JobOffers (job_id),
             FOREIGN KEY (candidate_id) REFERENCES Users (user_id)
         )
@@ -143,7 +145,13 @@ def fetch_recruiter_data(recruiter_id):
     cursor = conn.cursor()
     # Execute SQL queries to retrieve the recruiter's profile picture and job offer
     cursor.execute("SELECT profile_picture FROM Users WHERE user_id = ? and is_recruiter=True", (recruiter_id,))
-    profile_picture = cursor.fetchone()[0]
+    try:
+        profile_picture = cursor.fetchone()
+    except sqlite3.Error as e:
+        conn.rollback()
+        print(f"Error recruter data: {e}")
+    finally:
+        conn.close()
     return profile_picture
 
 
@@ -177,13 +185,13 @@ def get_cv_path(user_id):
     try:
         cursor.execute(
             'SELECT cv_path FROM Users WHERE user_id = ?',(user_id,))
-        conn.commit()
+        cv_path = cursor.fetchall()
     except sqlite3.Error as e:
         conn.rollback()
         print(f"Error updating CV path: {e}")
     finally:
         conn.close()
-        
+    return cv_path 
 
 def fetch_job_offers(search_term=None):
     conn = sqlite3.connect('recruitment.db')  # Modify the database path if needed
@@ -192,7 +200,7 @@ def fetch_job_offers(search_term=None):
     if search_term:
         query = f"SELECT title, company, location, description, experience, mode, location  FROM JobOffers WHERE title LIKE '%{search_term}%' OR company LIKE '%{search_term}%' OR description LIKE '%{search_term}%'"
     else:
-        query = "SELECT title, company, location, description, experience, mode, location FROM JobOffers"
+        query = "SELECT title, company, location, description, experience, mode, location, job_id FROM JobOffers"
     # Exécutez la requête SQL pour récupérer les offres d'emploi
     cursor.execute(query)
     job_offers = cursor.fetchall()
@@ -238,15 +246,15 @@ def update_token_user(user_token,user_email):
     conn.close()
     
     
-def save_application(user_id, job_title, cv_path):
+def save_application(user_id, job_id, job_title, cv_path, company):
     conn = sqlite3.connect('recruitment.db')  # Modify the database path if needed
     cursor = conn.cursor()
     try:
         # Insert the application details into the database
         cursor.execute("""
-            INSERT INTO Applications (candidate_id, job_title, cv_path)
-            VALUES (?, ?, ?)
-        """, (user_id, job_title, cv_path))
+            INSERT INTO Applications (candidate_id, job_id, job_title, cv_path, company)
+            VALUES (?, ?, ?, ?, ?)
+        """, (user_id, job_id, job_title, cv_path, company))
         # Commit the changes to the database
         conn.commit()
     except sqlite3.Error as e:
@@ -254,3 +262,49 @@ def save_application(user_id, job_title, cv_path):
     finally:
         # Close the database connection
         conn.close()
+
+
+def get_job_offers(recruiter_id):
+    conn = sqlite3.connect('recruitment.db')  # Modify the database path if needed
+    cursor = conn.cursor()
+    # Construisez la requête SQL en fonction du terme de recherche
+    cursor.execute("""SELECT title, company, location, description, experience, mode, job_id FROM JobOffers WHERE recruiter_id = ?""", (recruiter_id,))
+    # Exécutez la requête SQL pour récupérer les offres d'emploi
+    job_offers = cursor.fetchall()
+    conn.close()
+    return job_offers
+
+    # Function to get offer details by index
+def update_job_offer(job_id, title, company, location, experience, mode, description):
+    conn = sqlite3.connect('recruitment.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE JobOffers 
+        SET title=?, company=?, location=?, experience=?, mode=?, description=?
+        WHERE job_id=?
+    ''', (title, company, location, experience, mode, description, job_id))
+    conn.commit()
+    conn.close()
+    
+def delete_offer(job_id):
+    conn = sqlite3.connect('recruitment.db')
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM JobOffers WHERE job_id=?', (job_id,))
+    conn.commit()
+    conn.close()
+
+def applied_offer(user_id):
+    conn = sqlite3.connect('recruitment.db')  # Modify the database path if needed
+    cursor = conn.cursor()
+    # Construisez la requête SQL en fonction du terme de recherche
+    cursor.execute("""SELECT a.job_id,a.job_title, a.cv_path,a.application_status, j.company FROM Applications a, JobOffers j WHERE candidate_id = ? and a.job_id = j.job_id""", (user_id,))
+    # Exécutez la requête SQL pour récupérer les offres d'emploi
+    try:
+        offers_applied = cursor.fetchall()
+    except sqlite3.Error as e:
+        conn.rollback()
+        print(f"Error apply data: {e}")
+    finally:
+        conn.close()
+    return offers_applied
+    

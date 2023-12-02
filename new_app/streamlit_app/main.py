@@ -13,6 +13,7 @@ from email.mime.multipart import MIMEMultipart
 import hashlib
 from env import ENV_PASSWORD, ENV_EMAIL
 from dotenv import load_dotenv
+import uuid
 
 
 load_dotenv()
@@ -27,8 +28,6 @@ class RecruitmentApp:
         self.last_activity = time.time()  # Initialize last activity time
         self.SESSION_TIMEOUT = 60
         self.token_lifetime = 3600
-        
-        
         
         
     def check_session_timeout(self):
@@ -69,15 +68,22 @@ class RecruitmentApp:
                any(c.islower() for c in password) and any(c.isdigit() for c in password) 
       
     def show_sidebar(self):
-        self.last_activity = time.time()
         st.sidebar.image(self.logo_path, width=300)
         with st.sidebar:
+            user_data = fetch_user_data(self.session_state['user'])
             sidebar_options = ["Home", "Search Jobs", "Login"]
-            if self.session_state['user']:
+            if user_data and user_data[4]:
                 sidebar_options.append("Change Password")
                 sidebar_options.remove("Login")
                 sidebar_options.append("Log Out")
                 sidebar_options.append("User Profile")
+                sidebar_options.append("My Offers")
+            elif user_data and not user_data[4]:
+                sidebar_options.append("Change Password")
+                sidebar_options.remove("Login")
+                sidebar_options.append("Log Out")
+                sidebar_options.append("User Profile")
+                sidebar_options.append("My Applications")
             else:
                 sidebar_options.append("Register")
                 sidebar_options.append("Reset Password")
@@ -241,7 +247,6 @@ class RecruitmentApp:
             else:
                 feedback_message.error("Invalid token. Please check and try again.")
 
-
     
     def update_user_data(self, user_id, profile_picture, cv):
         if self.session_state['user']:
@@ -270,7 +275,7 @@ class RecruitmentApp:
                 f.write(profile_picture.read())
             save_profile_picture(profile_picture_path, user_id)
         if title and company and location and experience and mode and description :
-            save_job_offer(user_id, title, company, location, experience, mode, description)
+            save_job_offer(user_id, title, description, location, experience, mode, company)
 
     def show_user_profile(self):
         self.last_activity = time.time()
@@ -280,8 +285,7 @@ class RecruitmentApp:
             user_data = fetch_user_data(user_id)
             if user_data[4]:
                 u_id, username, email = user_data[0], user_data[1], user_data[3]
-                print(fetch_recruiter_data(u_id))
-                pic_path= fetch_recruiter_data(u_id)
+                pic_path= fetch_recruiter_data(u_id)[0]
                 st.write(f"Username: {username}")
                 st.write(f"Email: {email}")
                 st.header("Your picture")
@@ -307,14 +311,11 @@ class RecruitmentApp:
                 location = st.text_input('Location')
                 experience = st.text_input('Years of experience')
                 mode = st.text_input('Work Arrangement')
-                description = st.text_area('Description')
-
-
+                description = st.text_area('Description',height=200)
                 if st.button("Save Changes"):
                     self.update_recruiter_data(
-                        u_id, uploaded_profile_picture, title, company, location, experience, mode, description)
+                    u_id, uploaded_profile_picture, title, description , location, experience, mode,company )
                     st.success("Changes saved successfully!")
-                    st.rerun()
             else:
                 u_id, username, email = user_data[0], user_data[1], user_data[3]
                 pic_path, cv_path = get_uploaded_candidate_files(u_id)
@@ -393,7 +394,6 @@ class RecruitmentApp:
                 st.error("New passwords do not match.")
                 return
             # Print for debugging purposes
-            print(f'hereeeeeee{user_id}')
             if pbkdf2_sha256.verify(current_password,current_hashed_password ):
                 new_hashed_password = pbkdf2_sha256.hash(new_password)
                 self.update_password(user_id, new_hashed_password)
@@ -402,8 +402,88 @@ class RecruitmentApp:
             else:
                 st.error("Current password is incorrect.")
 
+    def show_offer(self):
+        self.last_activity = time.time()
+        st.title("Offers")
+        if not self.session_state['user']:
+            st.error("You are not logged in. Please log in to view and modify your offers.")
+            return
+        user_id = self.session_state['user']
+        job_offers = get_job_offers(user_id)
+        print(job_offers)
+        job_offers_container = st.container()
+        if not job_offers:
+            job_offers_container.error("No job offers available at the moment.")
+        else:
+            # Display job offers in a more visually appealing format
+            job_offers_container.subheader("Job Offers")
+            for index, job_offer in enumerate(job_offers, start=1):
+                with job_offers_container:
+                    edit_mode = st.checkbox(f"Edit Offer #{index}", key=f"edit_checkbox_{index}")
+                    if edit_mode:
+                        title = st.text_input(f"Title: {job_offer[0]}", key=f"title_input_{index}", value=job_offer[0])
+                        company = st.text_input(f"Company: {job_offer[3]}", key=f"company_input_{index}", value=job_offer[3])
+                        location = st.text_input(f"Location: {job_offer[2]}", key=f"location_input_{index}", value=job_offer[2])
+                        experience = st.text_input(f"Experience: {job_offer[4]}", key=f"experience_input_{index}", value=job_offer[4])
+                        mode = st.text_input(f"Mode: {job_offer[5]}", key=f"mode_input_{index}", value=job_offer[5])
+                        description = st.text_area("Description:", key=f"description_input_{index}", value=job_offer[1],height=280)
+                        # Add a save button to save the changes
+                        if st.button(f"Save Changes for Offer #{index}", key=f"save_button_{index}"):
+                            # Update the job offer in the database
+                            update_job_offer(job_offer[6], title, company, location, experience, mode, description)
+                            st.success("Changes saved successfully!")
+                        if st.button(f"Delete Offer #{index}", key=f"delete_button_{index}"):
+                            # Delete the job offer from the database
+                            delete_offer(job_offer[6])
+                            st.success("Offer deleted successfully!")
+                    else:
+                        # Display job offer details
+                        st.markdown(
+                            f"""
+                            <div style="background-color: #f5f5f5; padding: 20px; margin-bottom: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);">
+                                <h3>{job_offer[0]}</h3>
+                                <p><strong>Company:</strong> {job_offer[1]}</p>
+                                <p><strong>Location:</strong> {job_offer[2]}</p>
+                                <p><strong>Experience:</strong> {job_offer[4]}</p>
+                                <p><strong>Mode:</strong> {job_offer[5]}</p>
+                                <p><strong>Description:</strong> {job_offer[3]}</p>
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
 
+    def display_apply(self):
+        self.last_activity = time.time()
+        st.title("Applied")
+        if not self.session_state['user']:
+            st.error("You are not logged in. Please log in to view and modify your offers.")
+            return
+        user_id = self.session_state['user']
+        applied = applied_offer(user_id)
+        print(applied)
+        cv_path=applied
 
+        applied_container = st.container()
+        if not applied:
+            applied_container.error("No apply job available at the moment.")
+        else:
+            # Display job offers in a more visually appealing format
+            applied_container.subheader("Job Offers")
+            for index, apply in enumerate(applied, start=1):
+                with applied_container:
+                    st.markdown(
+                    f"""
+                    <div style="background-color: #f5f5f5; padding: 20px; margin-bottom: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);">
+                        <h3><strong>Job Title :  </strong>{apply[1]}</h3>
+                        <p><strong>Status : </strong> {apply[3]}</p>
+                        <p><strong>CV : </strong> {apply[2]}</p>
+                        <p><strong>Company : </strong> {apply[4]}</p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+        
 if __name__ == "__main__":
     app = RecruitmentApp()
     create_database(app.conn, app.cursor)
@@ -431,23 +511,23 @@ if __name__ == "__main__":
                         f"""
                         <div style="background-color: #f5f5f5; padding: 20px; margin-bottom: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);">
                             <h3>{job_offer[0]}</h3>
-                            <p><strong>Company:</strong> {job_offer[3]}</p>
+                            <p><strong>Company:</strong> {job_offer[1]}</p>
                             <p><strong>Location:</strong> {job_offer[2]}</p>
                             <p><strong>Experience:</strong> {job_offer[4]}</p>
                             <p><strong>Mode:</strong> {job_offer[5]}</p>
-                            <p><strong>Description:</strong> {job_offer[1]}</p>
+                            <p><strong>Description:</strong> {job_offer[3]}</p>
                         </div>
                         """,
                         unsafe_allow_html=True
                     )
                     apply_button = st.button(f"Apply for Job #{index}", key=f"apply_button_{index}")
                     if apply_button:
-                        print(f"Line 447 ----------- {user_id}")
+                        print(f"Line 490 ----------- {user_id}{job_offer}")
                         # Enregistrez le CV dans un emplacement spécifique (vous pouvez adapter cela selon votre structure)
-                        cv_path = get_cv_path(user_id)
-                        print(f"Line 450 ----------- {cv_path}")
+                        cv_path = get_cv_path(user_id)[0]
+                        print(f"Line 493 ----------- {job_offer}")
                         # Enregistrez les informations de candidature dans la base de données
-                        save_application(user_id, job_offer[0], cv_path)
+                        save_application(user_id, job_offer[7], job_offer[0], cv_path[0], job_offer[3])
                         st.success("Application submitted successfully!")
     elif selected_option == "Search Jobs":
         st.title("Search for Jobs")
@@ -465,20 +545,17 @@ if __name__ == "__main__":
                     # Utilisez st.expander pour créer des sections expansibles pour chaque offre d'emploi
                     with st.expander(f"Job Offer #{index} - {job_offer[0]}"):
                         st.write(f"**Job Title:** {job_offer[0]}")
-                        st.write(f"**Company:** {job_offer[3]}")
+                        st.write(f"**Company:** {job_offer[1]}")
                         st.write(f"**Location:** {job_offer[2]}")
-                        st.write(f"**Description:** {job_offer[1]}")
                         st.write(f"**Mode:** {job_offer[5]}")
                         st.write(f"**Experience:** {job_offer[4]}")
+                        st.write(f"**Description:** {job_offer[3]}")
                          # Ajoutez un bouton pour permettre aux candidats de postuler
                         apply_button = st.button(f"Apply for Job #{index}", key=f"apply_button_{index}")
                         user_id = app.session_state['user']
-                        print(f"Line 479------- {user_id}")
                         if apply_button:
-                            print(f"Line 481------- {user_id}")
                             # Enregistrez le CV dans un emplacement spécifique (vous pouvez adapter cela selon votre structure)
                             cv_path = get_cv_path(user_id)
-                            print(f"Line 484 ----------- {cv_path}")
                             # Enregistrez les informations de candidature dans la base de données
                             save_application(user_id, job_offer[0], cv_path)
                             st.success("Application submitted successfully!")
@@ -493,3 +570,7 @@ if __name__ == "__main__":
         app.show_user_profile()
     elif selected_option == "Log Out":
         app.log_out()
+    elif selected_option == "My Offers":
+        app.show_offer()
+    elif selected_option == "My Applications":
+        app.display_apply()
