@@ -78,6 +78,7 @@ class RecruitmentApp:
                 sidebar_options.append("Log Out")
                 sidebar_options.append("User Profile")
                 sidebar_options.append("My Offers")
+                sidebar_options.append("My Candidats")
             elif user_data and not user_data[4]:
                 sidebar_options.append("Change Password")
                 sidebar_options.remove("Login")
@@ -317,13 +318,13 @@ class RecruitmentApp:
                     u_id, uploaded_profile_picture, title, description , location, experience, mode,company )
                     st.success("Changes saved successfully!")
             else:
-                u_id, username, email = user_data[0], user_data[1], user_data[3]
+                u_id, username, email, profile_title,experiences = user_data[0], user_data[1],\
+                user_data[3], user_data[5], user_data[6]
                 pic_path, cv_path = get_uploaded_candidate_files(u_id)
-                st.write(f"Username: {username}")
-                st.write(f"Email: {email}")
                 st.header("Your picture")
                 if pic_path:
-                    st.image(pic_path, caption="Profile Picture", width=300)
+                    st.image(pic_path, caption="Profile Picture", width=200)
+                # Download button for CV outside the form
                 st.header("Your CV")
                 if cv_path:
                     with open(cv_path, 'rb') as pdf_file:
@@ -334,6 +335,13 @@ class RecruitmentApp:
                         key="pdf_download_button",
                         file_name=(f"{email}.pdf"),
                     )
+                # Modify Username
+                updated_username = st.text_input("Enter updated username", value=username)
+                # Modify Email
+                updated_email = st.text_input("Enter updated email", value=email)
+                # Modify Profile Title
+                updated_profile_title = st.text_input("Enter updated profile title", value=profile_title)
+                updated_experiences = st.text_input("Enter updated profile title", value=experiences)
                 st.header("Edit Profile")
                 uploaded_profile_picture = st.file_uploader(
                     "Upload Profile Picture (max size: 5 MB)",
@@ -341,35 +349,36 @@ class RecruitmentApp:
                     key="profile_picture_uploader",
                     accept_multiple_files=False
                 )
-                if uploaded_profile_picture:
-                    # Check the file size
-                    if len(uploaded_profile_picture.getvalue()) > 5 * 1024 * 1024:  # 5 MB limit
-                        st.error(
-                            "File size exceeds the allowed limit (5 MB). Please upload a smaller file.")
-                    else:
-                        # Process the file
-                        st.success("Profile picture uploaded successfully.")
                 uploaded_cv = st.file_uploader(
                     "Upload CV (PDF) (max size: 10 MB)",
                     type=["pdf"],
                     key="cv_uploader",
                     accept_multiple_files=False
                 )
-                if uploaded_cv:
-                    # Check the file size
-                    if len(uploaded_cv.getvalue()) > 10 * 1024 * 1024:  # 10 MB limit
-                        st.error(
-                            "File size exceeds the allowed limit (10 MB). Please upload a smaller file.")
-                    else:
-                        # Process the file
-                        st.success("CV uploaded successfully.")
+
+                # Save Changes button
                 if st.button("Save Changes"):
-                    self.update_user_data(
-                        u_id, uploaded_profile_picture, uploaded_cv)
+                    if uploaded_profile_picture:
+                        # Check the file size
+                        if len(uploaded_profile_picture.getvalue()) > 5 * 1024 * 1024:  # 5 MB limit
+                            st.error("File size exceeds the allowed limit (5 MB). Please upload a smaller file.")
+                        else:
+                            # Process the file
+                            st.success("Profile picture uploaded successfully.")
+                    if uploaded_cv:
+                        # Check the file size
+                        if len(uploaded_cv.getvalue()) > 10 * 1024 * 1024:  # 10 MB limit
+                            st.error("File size exceeds the allowed limit (10 MB). Please upload a smaller file.")
+                        else:
+                            # Process the file
+                            st.success("CV uploaded successfully.")
+
+                    # Update user data and profile title
+                    self.update_user_data(u_id, uploaded_profile_picture, uploaded_cv)
+                    update_user_title_profile(u_id, updated_profile_title, updated_email, updated_username,updated_experiences)
                     st.success("Changes saved successfully!")
                     st.rerun()
-        else:
-            st.error("You are not logged in. Please log in to view your profile.")
+
 
     def show_change_password(self):
         self.last_activity = time.time()
@@ -460,30 +469,70 @@ class RecruitmentApp:
             return
         user_id = self.session_state['user']
         applied = applied_offer(user_id)
-        print(applied)
         cv_path=applied
-
         applied_container = st.container()
         if not applied:
             applied_container.error("No apply job available at the moment.")
         else:
-            # Display job offers in a more visually appealing format
-            applied_container.subheader("Job Offers")
+            st.subheader("Search Results")
             for index, apply in enumerate(applied, start=1):
-                with applied_container:
-                    st.markdown(
-                    f"""
-                    <div style="background-color: #f5f5f5; padding: 20px; margin-bottom: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);">
-                        <h3><strong>Job Title :  </strong>{apply[1]}</h3>
-                        <p><strong>Status : </strong> {apply[3]}</p>
-                        <p><strong>CV : </strong> {apply[2]}</p>
-                        <p><strong>Company : </strong> {apply[4]}</p>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
+                # Utilize st.expander to create expandable sections for each job offer
+                with st.expander(f"Job Offer #{index} - {apply[0]}"):
+                    st.write(f"**Job Title:** {apply[1]}")
+                    st.write(f"**Status:** {apply[3]}")
+                    st.write(f"**Company:** {apply[4]}")
+                    st.write(f"**Description:** {apply[5]}")
 
-        
+                    # Download button for CV
+                    if cv_path:
+                        with open(cv_path[2][2], 'rb') as pdf_file:
+                            pdf_bytes = pdf_file.read()
+                        st.download_button(
+                            label="Download PDF",
+                            data=pdf_bytes,
+                            key=f"{index}_pdf_download_button_{apply[2]}",
+                            file_name=(f"{apply[2]}.pdf"),
+                        )
+
+
+    def display_candidats(self):
+        self.last_activity = time.time()
+        st.title("My Candidats")
+        search_term = st.text_input("Enter job search term:")
+        if not self.session_state['user']:
+            st.error("You are not logged in. Please log in to view and modify your offers.")
+            return
+        applied = applied_candidat(search_term)
+        print(applied)
+        if st.button("Search"):
+            # Récupérez les offres d'emploi filtrées en fonction du terme de recherche
+            # Affichez les résultats de la recherche
+            if not applied:
+                st.write("No job offers match your search.")
+            else:
+                st.subheader("Search Results")
+                for index, apply in enumerate(applied, start=1):
+                    # Utilize st.expander to create expandable sections for each job offer
+                    with st.expander(f"Job Offer #{index} - {apply[0]}"):
+                        if apply[5]:
+                            st.image(apply[2], caption="Profile Picture", width=150)
+                        st.write(f"**Nom du profile:** {apply[5]}")
+                        st.write(f"**Email:** {apply[3]}")
+                        if apply[6]:
+                            st.write(f"**Experiences:** {apply[6]}")
+                        st.write(f"**Status:** {apply[1]}")
+                        # Download button for CV
+                        with open(apply[4], 'rb') as pdf_file:
+                            pdf_bytes = pdf_file.read()
+                        st.download_button(
+                            label="Download PDF",
+                            data=pdf_bytes,
+                            key=f"{index}_pdf_download_button_{apply[2]}",
+                            file_name=(f"{apply[2]}.pdf"),
+                        )
+
+                        
+                        
 if __name__ == "__main__":
     app = RecruitmentApp()
     create_database(app.conn, app.cursor)
@@ -495,6 +544,9 @@ if __name__ == "__main__":
         st.title("Welcome to Your Recruitment Platform")
         st.write("Browse the latest job listings below:")
         user_id = app.session_state['user']
+        user_data = fetch_user_data(user_id)
+        print(user_id)
+        print(user_data)
         # Add a container to hold the job offers section
         job_offers_container = st.container()
         # Display job listings here
@@ -520,19 +572,23 @@ if __name__ == "__main__":
                         """,
                         unsafe_allow_html=True
                     )
-                    apply_button = st.button(f"Apply for Job #{index}", key=f"apply_button_{index}")
-                    if apply_button:
-                        print(f"Line 490 ----------- {user_id}{job_offer}")
-                        # Enregistrez le CV dans un emplacement spécifique (vous pouvez adapter cela selon votre structure)
-                        cv_path = get_cv_path(user_id)[0]
-                        print(f"Line 493 ----------- {job_offer}")
-                        # Enregistrez les informations de candidature dans la base de données
-                        save_application(user_id, job_offer[7], job_offer[0], cv_path[0], job_offer[3])
-                        st.success("Application submitted successfully!")
+                    if user_data:
+                        if not user_data[4]:
+                            apply_button = st.button(f"Apply for Job #{index}", key=f"apply_button_{index}")
+                            if apply_button:
+                                print(f"Line 490 ----------- {user_id}{job_offer}")
+                                # Enregistrez le CV dans un emplacement spécifique (vous pouvez adapter cela selon votre structure)
+                                cv_path = get_cv_path(user_id)[0]
+                                print(f"Line 493 ----------- {job_offer}")
+                                # Enregistrez les informations de candidature dans la base de données
+                                save_application(user_id, job_offer[7], job_offer[0], cv_path[0], job_offer[3])
+                                st.success("Application submitted successfully!")
     elif selected_option == "Search Jobs":
         st.title("Search for Jobs")
         search_term = st.text_input("Enter job search term:")
             # Si le bouton de recherche est cliqué
+        user_id = app.session_state['user']
+        user_data = fetch_user_data(user_id)
         if st.button("Search"):
             # Récupérez les offres d'emploi filtrées en fonction du terme de recherche
             job_offers = fetch_job_offers(search_term)
@@ -551,14 +607,16 @@ if __name__ == "__main__":
                         st.write(f"**Experience:** {job_offer[4]}")
                         st.write(f"**Description:** {job_offer[3]}")
                          # Ajoutez un bouton pour permettre aux candidats de postuler
-                        apply_button = st.button(f"Apply for Job #{index}", key=f"apply_button_{index}")
-                        user_id = app.session_state['user']
-                        if apply_button:
-                            # Enregistrez le CV dans un emplacement spécifique (vous pouvez adapter cela selon votre structure)
-                            cv_path = get_cv_path(user_id)
-                            # Enregistrez les informations de candidature dans la base de données
-                            save_application(user_id, job_offer[0], cv_path)
-                            st.success("Application submitted successfully!")
+                        if user_data:
+                            if not user_data[4]: 
+                                apply_button = st.button(f"Apply for Job #{index}", key=f"apply_button_{index}")
+                                user_id = app.session_state['user']
+                                if apply_button:
+                                    # Enregistrez le CV dans un emplacement spécifique (vous pouvez adapter cela selon votre structure)
+                                    cv_path = get_cv_path(user_id)
+                                    # Enregistrez les informations de candidature dans la base de données
+                                    save_application(user_id, job_offer[0], cv_path)
+                                    st.success("Application submitted successfully!")
                     # Implement your job search functionality
     elif selected_option == "Login":
         app.login_user()
@@ -574,3 +632,5 @@ if __name__ == "__main__":
         app.show_offer()
     elif selected_option == "My Applications":
         app.display_apply()
+    elif selected_option== "My Candidats":
+        app.display_candidats()

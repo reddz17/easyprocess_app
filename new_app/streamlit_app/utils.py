@@ -14,7 +14,9 @@ def create_database(conn, cursor):
             is_recruiter BOOLEAN NOT NULL,
             profile_picture TEXT,
             cv_path TEXT,
-            reset_token TEXT
+            reset_token TEXT,
+            profile_title TEXT,
+            experiences INTEGER
         )
     ''')
     cursor.execute('''
@@ -103,8 +105,14 @@ def fetch_user_data(user_id):
     conn = sqlite3.connect('recruitment.db')
     cursor = conn.cursor()
     cursor.execute(
-        'SELECT user_id, username, password, email_address, is_recruiter FROM Users WHERE user_id = ?', (user_id,))
-    return cursor.fetchone()
+        'SELECT user_id, username, password, email_address, is_recruiter, profile_title, experiences FROM Users WHERE user_id = ?', (user_id,))
+    user_data = cursor.fetchone()
+    if user_data is None:
+        # Handle the case when the user is not found
+        print(f"User with ID {user_id} not found.")
+        return None  # You can return a default value or raise an exception if needed
+    return user_data
+
 
 def fetch_user_data_mail(email):
     conn = sqlite3.connect('recruitment.db')
@@ -237,6 +245,22 @@ def update_user_password(user_email, new_password):
     cursor.execute("UPDATE Users SET password = ? WHERE email_address = ?", (hashed_password, user_email))
     conn.commit()
     conn.close()
+
+
+def update_user_title_profile(user_id, updated_profile_title, updated_email, updated_username, updated_experience):
+    conn = sqlite3.connect('recruitment.db')
+    cursor = conn.cursor()
+    # Update profile title
+    cursor.execute("UPDATE Users SET profile_title = ? WHERE user_id = ?", (updated_profile_title, user_id))
+    # Update email
+    cursor.execute("UPDATE Users SET email_address = ? WHERE user_id = ?", (updated_email, user_id))
+    # Update username
+    cursor.execute("UPDATE Users SET username = ? WHERE user_id = ?", (updated_username, user_id))
+    # Update experiences
+    cursor.execute("UPDATE Users SET experiences = ? WHERE user_id = ?", (updated_experience, user_id))
+    # Commit changes and close the connection
+    conn.commit()
+    conn.close()
     
 def update_token_user(user_token,user_email):
     conn = sqlite3.connect('recruitment.db')
@@ -297,7 +321,7 @@ def applied_offer(user_id):
     conn = sqlite3.connect('recruitment.db')  # Modify the database path if needed
     cursor = conn.cursor()
     # Construisez la requête SQL en fonction du terme de recherche
-    cursor.execute("""SELECT a.job_id,a.job_title, a.cv_path,a.application_status, j.company FROM Applications a, JobOffers j WHERE candidate_id = ? and a.job_id = j.job_id""", (user_id,))
+    cursor.execute("""SELECT a.job_id,a.job_title, a.cv_path,a.application_status, j.company, j.description FROM Applications a, JobOffers j WHERE candidate_id = ? and a.job_id = j.job_id""", (user_id,))
     # Exécutez la requête SQL pour récupérer les offres d'emploi
     try:
         offers_applied = cursor.fetchall()
@@ -308,3 +332,35 @@ def applied_offer(user_id):
         conn.close()
     return offers_applied
     
+def applied_candidat(search_term=None):
+    conn = sqlite3.connect('recruitment.db')  # Modify the database path if needed
+    cursor = conn.cursor()
+    # Construisez la requête SQL en fonction du terme de recherche
+    if search_term:
+        query = f"""SELECT a.job_id, a.application_status,
+                   u.profile_picture, u.email_address, u.cv_path, u.profile_title,u.experiences
+            FROM Applications a,
+                 JobOffers j,
+                 Users u 
+            WHERE a.candidate_id = u.user_id 
+                AND a.job_id = j.job_id
+                AND (u.email_address LIKE '%{search_term}%' 
+                     OR u.profile_title LIKE '%{search_term}%' 
+                     OR a.application_status LIKE '%{search_term}%')"""
+    else:
+        query = """SELECT a.job_id, a.application_status,
+                  u.profile_picture, u.email_address, u.cv_path, u.profile_title ,u.experiences 
+                FROM Applications a,
+                    JobOffers j, 
+                    Users u 
+                WHERE a.candidate_id = u.user_id and a.job_id = j.job_id"""
+    cursor.execute(query)
+    # Exécutez la requête SQL pour récupérer les offres d'emploi
+    try:
+        candidats = cursor.fetchall()
+    except sqlite3.Error as e:
+        conn.rollback()
+        print(f"Error apply data: {e}")
+    finally:
+        conn.close()
+    return candidats
