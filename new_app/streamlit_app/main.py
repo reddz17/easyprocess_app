@@ -68,7 +68,7 @@ class RecruitmentApp:
                any(c.islower() for c in password) and any(c.isdigit() for c in password) 
       
     def show_sidebar(self):
-        st.sidebar.image(self.logo_path, width=300)
+        st.sidebar.image(self.logo_path, width=290)
         with st.sidebar:
             user_data = fetch_user_data(self.session_state['user'])
             sidebar_options = ["Home", "Search Jobs", "Login"]
@@ -286,12 +286,13 @@ class RecruitmentApp:
             user_data = fetch_user_data(user_id)
             if user_data[4]:
                 u_id, username, email = user_data[0], user_data[1], user_data[3]
-                pic_path= fetch_recruiter_data(u_id)[0]
-                st.write(f"Username: {username}")
-                st.write(f"Email: {email}")
+                pic_path= fetch_recruiter_picture(u_id)
+                updated_username = st.text_input("Enter updated username", value=username)
+                # Modify Email
+                updated_email = st.text_input("Enter updated email", value=email)
                 st.header("Your picture")
                 if pic_path:
-                    st.image(pic_path, caption="Profile Picture", width=300)
+                    st.image(pic_path, caption="Profile Picture", width=150)
                 st.header("Edit Profile")
                 uploaded_profile_picture = st.file_uploader(
                     "Upload Profile Picture (max size: 5 MB)",
@@ -316,6 +317,7 @@ class RecruitmentApp:
                 if st.button("Save Changes"):
                     self.update_recruiter_data(
                     u_id, uploaded_profile_picture, title, description , location, experience, mode,company )
+                    update_candidat_title_profile(u_id, updated_email, updated_username)
                     st.success("Changes saved successfully!")
             else:
                 u_id, username, email, profile_title,experiences = user_data[0], user_data[1],\
@@ -419,7 +421,6 @@ class RecruitmentApp:
             return
         user_id = self.session_state['user']
         job_offers = get_job_offers(user_id)
-        print(job_offers)
         job_offers_container = st.container()
         if not job_offers:
             job_offers_container.error("No job offers available at the moment.")
@@ -558,7 +559,10 @@ if __name__ == "__main__":
             job_offers_container.subheader("Job Offers")
             for index, job_offer in enumerate(job_offers, start=1):
                 with job_offers_container:
-                    pic_path= fetch_recruiter_data(user_id)
+                    pic_path= fetch_recruiter_picture(user_id)
+                    print(pic_path)
+                    if pic_path:
+                        st.image(pic_path, caption="Recruiter Profile Picture", width=100)
                     st.markdown(
                         f"""
                         <div style="background-color: #f5f5f5; padding: 20px; margin-bottom: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);">

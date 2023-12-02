@@ -148,7 +148,7 @@ def get_uploaded_candidate_files(u_id):
     return profile_picture_path, cv_path
 
 
-def fetch_recruiter_data(recruiter_id):
+def fetch_recruiter_picture(recruiter_id):
     conn = sqlite3.connect('recruitment.db')  # Modify the database path if needed
     cursor = conn.cursor()
     # Execute SQL queries to retrieve the recruiter's profile picture and job offer
@@ -158,9 +158,14 @@ def fetch_recruiter_data(recruiter_id):
     except sqlite3.Error as e:
         conn.rollback()
         print(f"Error recruter data: {e}")
+        return None
     finally:
         conn.close()
-    return profile_picture
+    if profile_picture:
+        return profile_picture[0]
+    else:
+        return None
+
 
 
 
@@ -261,6 +266,18 @@ def update_user_title_profile(user_id, updated_profile_title, updated_email, upd
     # Commit changes and close the connection
     conn.commit()
     conn.close()
+
+def update_candidat_title_profile(user_id, updated_email, updated_username):
+    conn = sqlite3.connect('recruitment.db')
+    cursor = conn.cursor()
+    # Update email
+    cursor.execute("UPDATE Users SET email_address = ? WHERE user_id = ?", (updated_email, user_id))
+    # Update username
+    cursor.execute("UPDATE Users SET username = ? WHERE user_id = ?", (updated_username, user_id))
+    # Commit changes and close the connection
+    conn.commit()
+    conn.close()
+
     
 def update_token_user(user_token,user_email):
     conn = sqlite3.connect('recruitment.db')
