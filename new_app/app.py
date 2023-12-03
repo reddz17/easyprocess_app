@@ -3,14 +3,16 @@ sys.path.append('/d/HETIC/Mastère 2/projet entreprenaria/easyprocess_app/new_ap
 
 from flask import Flask, render_template, request
 import streamlit.components.v1 as components
-from streamlit_app.utils import get_user_email_from_token, update_user_password
+from streamlit_app.sender_mail import get_user_email_from_token,is_valid_password
+from streamlit_app.user import update_user_password
+
 
 app = Flask(__name__)
 
 # Your Flask routes and views go here...
-def is_valid_password(password):
-    return len(password)>=12 and any(c.isupper() for c in password)and\
-            any(c.islower() for c in password) and any(c.isdigit() for c in password) 
+# def is_valid_password(password):
+#     return len(password)>=12 and any(c.isupper() for c in password)and\
+#             any(c.islower() for c in password) and any(c.isdigit() for c in password) 
 
 
 @app.route('/')

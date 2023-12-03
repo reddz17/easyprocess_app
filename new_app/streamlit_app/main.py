@@ -5,30 +5,19 @@ from passlib.hash import pbkdf2_sha256
 import pickle
 import os
 from utils import *
-import time
-import re 
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-import hashlib
-from env import ENV_PASSWORD, ENV_EMAIL
 from dotenv import load_dotenv
-import uuid
-
+from user import *
+from recruiter import *
+from sender_mail import *
 
 load_dotenv()
 class RecruitmentApp:
     def __init__(self):
-        # Create or connect to the SQLite database
-        self.conn = sqlite3.connect('recruitment.db')
-        self.cursor = self.conn.cursor()
         self.logo_path = os.getenv("logo_path")
         self.load_session_state()
         self.initialize_session_state()
         self.last_activity = time.time()  # Initialize last activity time
         self.SESSION_TIMEOUT = 60
-        self.token_lifetime = 3600
-        
         
     def check_session_timeout(self):
         # Check if the session has timed out due to inactivity
@@ -59,14 +48,6 @@ class RecruitmentApp:
             os.remove('session_state.pkl')
         st.rerun()
     
-    def is_valid_email(self,email):
-        email_pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'
-        return re.match(email_pattern,email) is not None
-    
-    def is_valid_password(self,password):
-        return len(password)>=12 and any(c.isupper() for c in password)and\
-               any(c.islower() for c in password) and any(c.isdigit() for c in password) 
-      
     def show_sidebar(self):
         st.sidebar.image(self.logo_path, width=290)
         with st.sidebar:
@@ -142,11 +123,11 @@ class RecruitmentApp:
                 st.error("Email already exists. Please use a different email.")
                 show_error = True
             # Validate email
-            if not self.is_valid_email(new_email):
+            if not is_valid_email(new_email):
                 st.error("Please enter a valid email address")
                 show_error = True  
             # Validate password
-            if not self.is_valid_password(new_password):
+            if not is_valid_password(new_password):
                 st.error("Password must be at least 12 characters with at least one uppercase letter, one lowercase letter, and one digit")
                 show_error = True       
             # Check if passwords match
@@ -169,114 +150,6 @@ class RecruitmentApp:
             if show_error:
                 st.error("Please correct the errors in the form")
                 
-                
-    def reset_password(self):
-        st.title("Reset Password")
-        reset_email = st.text_input("Enter your registered email address").lower()
-        if st.button("Reset Password", key="reset_password_button"):
-            user_data = fetch_user_data_mail(reset_email)
-            if user_data:
-                confirmation_link,token = self.generate_confirmation_link(reset_email)
-                update_token_user(token,reset_email)
-                self.send_reset_password_email(reset_email, confirmation_link)  # Send the reset password email
-                st.success("Password reset confirmation email sent. Please check your email.")
-            else:
-                st.error("Email not found. Please enter a registered email address.")
-
-
-
-    def send_reset_password_email(self,recipient_email, reset_link):
-        # Email configuration
-        smtp_server = "smtp-mail.outlook.com"
-        smtp_port = 587
-        sender_email = ENV_EMAIL  # Your email address
-        sender_password = ENV_PASSWORD  # Your email password
-        # Create the email message
-        message = MIMEMultipart()
-        message["From"] = sender_email
-        message["To"] = recipient_email
-        message["Subject"] = "Password Reset Request"
-        # Email body
-        email_body = f"Click the following link to reset your password: {reset_link}"
-        message.attach(MIMEText(email_body, "plain"))
-        # Connect to the SMTP server and send the email
-        try:
-            server = smtplib.SMTP(smtp_server, smtp_port)
-            server.starttls()
-            server.login(sender_email, sender_password)
-            server.sendmail(sender_email, recipient_email, message.as_string())
-            server.quit()
-            return True
-        except Exception as e:
-            st.error(f"Error sending password reset email: {str(e)}")
-            return False
-
-    def generate_confirmation_link(self, email):
-        token = hashlib.md5((email + str(time.time())).encode()).hexdigest()
-        expiration_time = time.time() + self.token_lifetime
-        confirmation_link = f"http://localhost:5000/reset_password?token={token}&expiration={expiration_time}"
-        return confirmation_link, token
-
-    def is_token_expired(self, expiration_time):
-        current_time = time.time()
-        return current_time > expiration_time
-
-    # Modify the change_password_with_token function
-    def change_password_with_token(self):
-        st.title("Change Password with Token")
-        token = st.text_input("Enter the password reset token")
-        stored_token, expiration_time = self.retrieve_token_locally()
-        feedback_message = st.empty()  # Create an empty space for feedback
-        if st.button("Reset Password"):
-            if token == stored_token and not self.is_token_expired(expiration_time):
-                feedback_message.success("Token is valid and not expired. You can now reset your password.")
-                feedback_message = st.empty()
-                # Implement the password reset functionality here
-                # Allow the user to enter and confirm the new password
-                new_password = st.text_input("New Password", type="password")
-                confirm_password = st.text_input("Confirm New Password", type="password")
-                if confirm_password == new_password:
-                    # Perform the password reset
-                    user_email = self.retrieve_user_email_from_token(token)
-                    new_hashed_password = pbkdf2_sha256.hash(new_password)
-                    change_password(new_hashed_password, user_email)
-                    feedback_message.success("Password reset successfully. You can now log in with your new password.")
-                else:
-                    feedback_message.error("Invalid password. Please check and try again.")
-            elif self.is_token_expired(expiration_time):
-                feedback_message.error("Token has expired. Please request a new password reset link.")
-            else:
-                feedback_message.error("Invalid token. Please check and try again.")
-
-    
-    def update_user_data(self, user_id, profile_picture, cv):
-        if self.session_state['user']:
-            if profile_picture:
-                profile_picture_path = os.path.join(
-                    f"{os.getenv('profile_path')}{user_id}.jpg")
-                os.makedirs(os.path.dirname(
-                    profile_picture_path), exist_ok=True)
-                with open(profile_picture_path, "wb") as f:
-                    f.write(profile_picture.read())
-                save_profile_picture(profile_picture_path, user_id)
-            if cv:
-                cv_path = os.path.join(
-                    f"{os.getenv('cv_path')}{user_id}_cv.pdf")
-                os.makedirs(os.path.dirname(cv_path), exist_ok=True)
-                with open(cv_path, "wb") as f:
-                    f.write(cv.read())
-                save_cv_path(cv_path, user_id)
-
-    def update_recruiter_data(self, user_id, profile_picture, title, company, location, experience, mode, description):
-        if profile_picture:
-            profile_picture_path = os.path.join(
-                f"{os.getenv('profile_path')}{user_id}.jpg")
-            os.makedirs(os.path.dirname(profile_picture_path), exist_ok=True)
-            with open(profile_picture_path, "wb") as f:
-                f.write(profile_picture.read())
-            save_profile_picture(profile_picture_path, user_id)
-        if title and company and location and experience and mode and description :
-            save_job_offer(user_id, title, description, location, experience, mode, company)
 
     def show_user_profile(self):
         self.last_activity = time.time()
@@ -315,8 +188,8 @@ class RecruitmentApp:
                 mode = st.text_input('Work Arrangement')
                 description = st.text_area('Description',height=200)
                 if st.button("Save Changes"):
-                    self.update_recruiter_data(
-                    u_id, uploaded_profile_picture, title, description , location, experience, mode,company )
+                    update_recruiter_data(
+                    u_id, uploaded_profile_picture, title, description, location, experience, mode, company)
                     update_candidat_title_profile(u_id, updated_email, updated_username)
                     st.success("Changes saved successfully!")
             else:
@@ -376,7 +249,7 @@ class RecruitmentApp:
                             st.success("CV uploaded successfully.")
 
                     # Update user data and profile title
-                    self.update_user_data(u_id, uploaded_profile_picture, uploaded_cv)
+                    update_user_data(u_id, uploaded_profile_picture, uploaded_cv)
                     update_user_title_profile(u_id, updated_profile_title, updated_email, updated_username,updated_experiences)
                     st.success("Changes saved successfully!")
                     st.rerun()
@@ -531,23 +404,46 @@ class RecruitmentApp:
                             key=f"{index}_pdf_download_button_{apply[2]}",
                             file_name=(f"{apply[2]}.pdf"),
                         )
+    def seach_job(self):
+        st.title("Search for Jobs")
+        search_term = st.text_input("Enter job search term:")
+            # Si le bouton de recherche est cliqué
+        user_id = app.session_state['user']
+        user_data = fetch_user_data(user_id)
+        if st.button("Search"):
+            # Récupérez les offres d'emploi filtrées en fonction du terme de recherche
+            job_offers = fetch_job_offers(search_term)
+            # Affichez les résultats de la recherche
+            if not job_offers:
+                st.write("No job offers match your search.")
+            else:
+                st.subheader("Search Results")
+                for index, job_offer in enumerate(job_offers, start=1):
+                    # Utilisez st.expander pour créer des sections expansibles pour chaque offre d'emploi
+                    with st.expander(f"Job Offer #{index} - {job_offer[0]}"):
+                        st.write(f"**Job Title:** {job_offer[0]}")
+                        st.write(f"**Company:** {job_offer[1]}")
+                        st.write(f"**Location:** {job_offer[2]}")
+                        st.write(f"**Mode:** {job_offer[5]}")
+                        st.write(f"**Experience:** {job_offer[4]}")
+                        st.write(f"**Description:** {job_offer[3]}")
+                         # Ajoutez un bouton pour permettre aux candidats de postuler
+                        if user_data:
+                            if not user_data[4]: 
+                                apply_button = st.button(f"Apply for Job #{index}", key=f"apply_button_{index}")
+                                user_id = app.session_state['user']
+                                if apply_button:
+                                    # Enregistrez le CV dans un emplacement spécifique (vous pouvez adapter cela selon votre structure)
+                                    cv_path = get_cv_path(user_id)
+                                    # Enregistrez les informations de candidature dans la base de données
+                                    save_application(user_id, job_offer[0], cv_path)
+                                    st.success("Application submitted successfully!")
 
-                        
-                        
-if __name__ == "__main__":
-    app = RecruitmentApp()
-    create_database(app.conn, app.cursor)
-    selected_option = app.show_sidebar()
-    app.check_session_timeout()
-    if selected_option == "Reset Password":
-        app.reset_password()
-    elif selected_option == "Home":
+    def home_page(self):
         st.title("Welcome to Your Recruitment Platform")
         st.write("Browse the latest job listings below:")
         user_id = app.session_state['user']
         user_data = fetch_user_data(user_id)
-        print(user_id)
-        print(user_data)
         # Add a container to hold the job offers section
         job_offers_container = st.container()
         # Display job listings here
@@ -586,42 +482,19 @@ if __name__ == "__main__":
                                 print(f"Line 493 ----------- {job_offer}")
                                 # Enregistrez les informations de candidature dans la base de données
                                 save_application(user_id, job_offer[7], job_offer[0], cv_path[0], job_offer[3])
-                                st.success("Application submitted successfully!")
+                                st.success("Application submitted successfully!")      
+                        
+if __name__ == "__main__":
+    app = RecruitmentApp()
+    create_database()
+    selected_option = app.show_sidebar()
+    app.check_session_timeout()
+    if selected_option == "Reset Password":
+        reset_password()
+    elif selected_option == "Home":
+        app.home_page()
     elif selected_option == "Search Jobs":
-        st.title("Search for Jobs")
-        search_term = st.text_input("Enter job search term:")
-            # Si le bouton de recherche est cliqué
-        user_id = app.session_state['user']
-        user_data = fetch_user_data(user_id)
-        if st.button("Search"):
-            # Récupérez les offres d'emploi filtrées en fonction du terme de recherche
-            job_offers = fetch_job_offers(search_term)
-            # Affichez les résultats de la recherche
-            if not job_offers:
-                st.write("No job offers match your search.")
-            else:
-                st.subheader("Search Results")
-                for index, job_offer in enumerate(job_offers, start=1):
-                    # Utilisez st.expander pour créer des sections expansibles pour chaque offre d'emploi
-                    with st.expander(f"Job Offer #{index} - {job_offer[0]}"):
-                        st.write(f"**Job Title:** {job_offer[0]}")
-                        st.write(f"**Company:** {job_offer[1]}")
-                        st.write(f"**Location:** {job_offer[2]}")
-                        st.write(f"**Mode:** {job_offer[5]}")
-                        st.write(f"**Experience:** {job_offer[4]}")
-                        st.write(f"**Description:** {job_offer[3]}")
-                         # Ajoutez un bouton pour permettre aux candidats de postuler
-                        if user_data:
-                            if not user_data[4]: 
-                                apply_button = st.button(f"Apply for Job #{index}", key=f"apply_button_{index}")
-                                user_id = app.session_state['user']
-                                if apply_button:
-                                    # Enregistrez le CV dans un emplacement spécifique (vous pouvez adapter cela selon votre structure)
-                                    cv_path = get_cv_path(user_id)
-                                    # Enregistrez les informations de candidature dans la base de données
-                                    save_application(user_id, job_offer[0], cv_path)
-                                    st.success("Application submitted successfully!")
-                    # Implement your job search functionality
+        app.seach_job()
     elif selected_option == "Login":
         app.login_user()
     elif selected_option == "Register":
