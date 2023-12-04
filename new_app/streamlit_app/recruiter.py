@@ -30,7 +30,7 @@ def fetch_job_offers(search_term=None):
     # Construisez la requête SQL en fonction du terme de recherche
     if search_term:
         query = f"""SELECT title, company, location, description,
-        experience, mode, location  
+        experience, mode, location, job_id  
         FROM JobOffers 
         WHERE title LIKE '%{search_term}%' OR company LIKE '%{search_term}%' OR description LIKE '%{search_term}%'"""
     else:

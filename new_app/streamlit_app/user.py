@@ -128,13 +128,13 @@ def get_cv_path(user_id):
     try:
         cursor.execute(
             'SELECT cv_path FROM Users WHERE user_id = ?',(user_id,))
-        cv_path = cursor.fetchall()
+        cv_path = cursor.fetchone()
     except sqlite3.Error as e:
         conn.rollback()
         print(f"Error updating CV path: {e}")
     finally:
         conn.close()
-    return cv_path 
+    return cv_path[0]
 
 def check_email_exists(new_email):
     # Connect to the SQLite database (replace with your database connection logic)

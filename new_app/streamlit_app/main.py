@@ -247,7 +247,6 @@ class RecruitmentApp:
                         else:
                             # Process the file
                             st.success("CV uploaded successfully.")
-
                     # Update user data and profile title
                     update_user_data(u_id, uploaded_profile_picture, uploaded_cv)
                     update_user_title_profile(u_id, updated_profile_title, updated_email, updated_username,updated_experiences)
@@ -356,7 +355,6 @@ class RecruitmentApp:
                     st.write(f"**Status:** {apply[3]}")
                     st.write(f"**Company:** {apply[4]}")
                     st.write(f"**Description:** {apply[5]}")
-
                     # Download button for CV
                     if cv_path:
                         with open(cv_path[2][2], 'rb') as pdf_file:
@@ -369,6 +367,94 @@ class RecruitmentApp:
                         )
 
 
+    def seach_job(self):
+        st.title("Search for Jobs")
+        search_term = st.text_input("Enter job search term:")
+        # Si le bouton de recherche est cliqué
+        user_id = app.session_state['user']
+        user_data = fetch_user_data(user_id)
+        if st.button("Search"):
+            # Récupérez les offres d'emploi filtrées en fonction du terme de recherche
+            job_offers = fetch_job_offers(search_term)
+            # Affichez les résultats de la recherche
+            if not job_offers:
+                st.write("No job offers match your search.")
+            else:
+                st.subheader("Search Results")
+                for index, job_offer in enumerate(job_offers, start=1):
+                    # Utilisez st.expander pour créer des sections expansibles pour chaque offre d'emploi
+                    with st.expander(f"Job Offer #{index} - {job_offer[0]}"):
+                        st.write(f"**Job Title:** {job_offer[0]}")
+                        st.write(f"**Company:** {job_offer[1]}")
+                        st.write(f"**Location:** {job_offer[2]}")
+                        st.write(f"**Mode:** {job_offer[5]}")
+                        st.write(f"**Experience:** {job_offer[4]}")
+                        st.write(f"**Description:** {job_offer[3]}")
+                        # Ajoutez un bouton pour permettre aux candidats de postuler
+                        if user_data:
+                            if not user_data[4]: 
+                                apply_button = st.button(f"Apply for Job #{index}", key=f"apply_button_{index}")
+                                user_id = app.session_state['user']
+                                # Check if the user has already applied for this job
+                                applied_jobs = [apply[0] for apply in applied_offer(user_id)]
+                                if job_offer[7] in applied_jobs:
+                                    st.warning("You have already applied for this job.")
+                                elif apply_button:
+                                    # Enregistrez le CV dans un emplacement spécifique (vous pouvez adapter cela selon votre structure)
+                                    cv_path = get_cv_path(user_id)
+                                    # Enregistrez les informations de candidature dans la base de données
+                                    save_application(user_id, job_offer[7], job_offer[0], cv_path, job_offer[1])
+                                    st.success("Application submitted successfully!")
+    
+    def home_page(self):
+        st.title("Welcome to Your Recruitment Platform")
+        st.write("Browse the latest job listings below:")
+        user_id = app.session_state['user']
+        user_data = fetch_user_data(user_id)
+        # Add a container to hold the job offers section
+        job_offers_container = st.container()
+        # Display job listings here
+        job_offers = fetch_job_offers()
+        if not job_offers:
+            job_offers_container.error("No job offers available at the moment.")
+        else:
+            # Display job offers in a more visually appealing format
+            job_offers_container.subheader("Job Offers")
+            for index, job_offer in enumerate(job_offers, start=1):
+                with job_offers_container:
+                    pic_path= fetch_recruiter_picture(user_id)
+                    if pic_path:
+                        st.image(pic_path, caption="Recruiter Profile Picture", width=100)
+                    st.markdown(
+                        f"""
+                        <div style="background-color: #f5f5f5; padding: 20px; margin-bottom: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);">
+                            <h3>{job_offer[0]}</h3>
+                            <p><strong>Company:</strong> {job_offer[1]}</p>
+                            <p><strong>Location:</strong> {job_offer[2]}</p>
+                            <p><strong>Experience:</strong> {job_offer[4]}</p>
+                            <p><strong>Mode:</strong> {job_offer[5]}</p>
+                            <p><strong>Description:</strong> {job_offer[3]}</p>
+                        </div>
+                        """,
+                        unsafe_allow_html=True
+                    )
+                    if user_data:
+                        if not user_data[4]: 
+                            apply_button = st.button(f"Apply for Job #{index}", key=f"apply_button_{index}")
+                            user_id = app.session_state['user']
+                            # Check if the user has already applied for this job
+                            applied_jobs = [apply[0] for apply in applied_offer(user_id)]
+                            if job_offer[7] in applied_jobs:
+                                st.warning("You have already applied for this job.")
+                            elif apply_button:
+                                # Enregistrez le CV dans un emplacement spécifique (vous pouvez adapter cela selon votre structure)
+                                cv_path = get_cv_path(user_id)
+                                print(cv_path)
+                                # Enregistrez les informations de candidature dans la base de données
+                                save_application(user_id, job_offer[7], job_offer[0], cv_path,job_offer[1])
+                                st.success("Application submitted successfully!")                  
+                        
+                                    
     def display_candidats(self):
         self.last_activity = time.time()
         st.title("My Candidats")
@@ -404,86 +490,7 @@ class RecruitmentApp:
                             key=f"{index}_pdf_download_button_{apply[2]}",
                             file_name=(f"{apply[2]}.pdf"),
                         )
-    def seach_job(self):
-        st.title("Search for Jobs")
-        search_term = st.text_input("Enter job search term:")
-            # Si le bouton de recherche est cliqué
-        user_id = app.session_state['user']
-        user_data = fetch_user_data(user_id)
-        if st.button("Search"):
-            # Récupérez les offres d'emploi filtrées en fonction du terme de recherche
-            job_offers = fetch_job_offers(search_term)
-            # Affichez les résultats de la recherche
-            if not job_offers:
-                st.write("No job offers match your search.")
-            else:
-                st.subheader("Search Results")
-                for index, job_offer in enumerate(job_offers, start=1):
-                    # Utilisez st.expander pour créer des sections expansibles pour chaque offre d'emploi
-                    with st.expander(f"Job Offer #{index} - {job_offer[0]}"):
-                        st.write(f"**Job Title:** {job_offer[0]}")
-                        st.write(f"**Company:** {job_offer[1]}")
-                        st.write(f"**Location:** {job_offer[2]}")
-                        st.write(f"**Mode:** {job_offer[5]}")
-                        st.write(f"**Experience:** {job_offer[4]}")
-                        st.write(f"**Description:** {job_offer[3]}")
-                         # Ajoutez un bouton pour permettre aux candidats de postuler
-                        if user_data:
-                            if not user_data[4]: 
-                                apply_button = st.button(f"Apply for Job #{index}", key=f"apply_button_{index}")
-                                user_id = app.session_state['user']
-                                if apply_button:
-                                    # Enregistrez le CV dans un emplacement spécifique (vous pouvez adapter cela selon votre structure)
-                                    cv_path = get_cv_path(user_id)
-                                    # Enregistrez les informations de candidature dans la base de données
-                                    save_application(user_id, job_offer[0], cv_path)
-                                    st.success("Application submitted successfully!")
 
-    def home_page(self):
-        st.title("Welcome to Your Recruitment Platform")
-        st.write("Browse the latest job listings below:")
-        user_id = app.session_state['user']
-        user_data = fetch_user_data(user_id)
-        # Add a container to hold the job offers section
-        job_offers_container = st.container()
-        # Display job listings here
-        job_offers = fetch_job_offers()
-        if not job_offers:
-            job_offers_container.error("No job offers available at the moment.")
-        else:
-            # Display job offers in a more visually appealing format
-            job_offers_container.subheader("Job Offers")
-            for index, job_offer in enumerate(job_offers, start=1):
-                with job_offers_container:
-                    pic_path= fetch_recruiter_picture(user_id)
-                    print(pic_path)
-                    if pic_path:
-                        st.image(pic_path, caption="Recruiter Profile Picture", width=100)
-                    st.markdown(
-                        f"""
-                        <div style="background-color: #f5f5f5; padding: 20px; margin-bottom: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);">
-                            <h3>{job_offer[0]}</h3>
-                            <p><strong>Company:</strong> {job_offer[1]}</p>
-                            <p><strong>Location:</strong> {job_offer[2]}</p>
-                            <p><strong>Experience:</strong> {job_offer[4]}</p>
-                            <p><strong>Mode:</strong> {job_offer[5]}</p>
-                            <p><strong>Description:</strong> {job_offer[3]}</p>
-                        </div>
-                        """,
-                        unsafe_allow_html=True
-                    )
-                    if user_data:
-                        if not user_data[4]:
-                            apply_button = st.button(f"Apply for Job #{index}", key=f"apply_button_{index}")
-                            if apply_button:
-                                print(f"Line 490 ----------- {user_id}{job_offer}")
-                                # Enregistrez le CV dans un emplacement spécifique (vous pouvez adapter cela selon votre structure)
-                                cv_path = get_cv_path(user_id)[0]
-                                print(f"Line 493 ----------- {job_offer}")
-                                # Enregistrez les informations de candidature dans la base de données
-                                save_application(user_id, job_offer[7], job_offer[0], cv_path[0], job_offer[3])
-                                st.success("Application submitted successfully!")      
-                        
 if __name__ == "__main__":
     app = RecruitmentApp()
     create_database()
