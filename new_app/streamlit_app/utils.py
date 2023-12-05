@@ -29,6 +29,7 @@ def create_database():
             experience TEXT NOT NULL,
             mode TEXT NOT NULL,
             location TEXT NOT NULL,
+            publication_date datetime,
             FOREIGN KEY (recruiter_id) REFERENCES Users (user_id)
         )
     ''')

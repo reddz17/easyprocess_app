@@ -46,7 +46,125 @@ def send_reset_password_email(recipient_email, reset_link):
     except Exception as e:
         st.error(f"Error sending password reset email: {str(e)}")
         return False
+    
+def send_email_offer(recipient_email,username,titre, description,company):
+    # Email configuration
+    smtp_server = "smtp-mail.outlook.com"
+    smtp_port = 587
+    sender_email = os.getenv("ENV_EMAIL")  # Your email address
+    sender_password = os.getenv("ENV_PASSWORD")  # Your email password
+    # Create the email message
+    message = MIMEMultipart()
+    message["From"] = sender_email
+    message["To"] = recipient_email
+    message["Subject"] = "accusé de reception de {company} pour l'offre {titre}"
+    # Email body
+    email_body = f"""Cher / Chère {username},
 
+        Merci d’avoir postulé à l’offre {titre} . Nous allons étudier vos expériences et qualifications dans les plus brefs délais. 
+        Si votre profil correspond à nos attentes, un membre de notre équipe entrera en contact avec vous.
+                        
+                     {description}
+                        
+                     En vous souhaitant bonne chance !
+                     {company} """
+    message.attach(MIMEText(email_body, "plain"))
+    # Connect to the SMTP server and send the email
+    try:
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+        server.login(sender_email, sender_password)
+        server.sendmail(sender_email, recipient_email, message.as_string())
+        server.quit()
+        return True
+    except Exception as e:
+        st.error(f"Error sending password reset email: {str(e)}")
+        return False
+    
+def send_acceptation(username, recipient_email, company, offre):
+    # Email configuration
+    smtp_server = "smtp-mail.outlook.com"
+    smtp_port = 587
+    sender_email = os.getenv("ENV_EMAIL")  # Your email address
+    sender_password = os.getenv("ENV_PASSWORD")  # Your email password
+    
+    # Create the email message
+    message = MIMEMultipart()
+    message["From"] = sender_email
+    message["To"] = recipient_email
+    message["Subject"] = f"Accusé de réception de {company} pour l'offre {offre}"
+    
+    # Email body
+    email_body = f"""Cher / Chère {username},
+
+Félicitations ! Nous sommes ravis de vous annoncer que vous avez été sélectionné(e) pour le poste de {offre} chez {company}.
+
+Nous attendons avec impatience votre arrivée. Veuillez trouver ci-joint les documents nécessaires à remplir avant votre première journée.
+
+Si vous avez des questions, n'hésitez pas à nous contacter.
+
+Bienvenue dans l'équipe !
+
+Cordialement,
+{company}"""
+    
+    message.attach(MIMEText(email_body, "plain"))
+    
+    # Connect to the SMTP server and send the email
+    try:
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+        server.login(sender_email, sender_password)
+        server.sendmail(sender_email, recipient_email, message.as_string())
+        server.quit()
+        return True
+    except Exception as e:
+        st.error(f"Error sending password reset email: {str(e)}")
+        return False
+
+def send_declination(username, recipient_email, company, offre):
+    # Email configuration
+    smtp_server = "smtp-mail.outlook.com"
+    smtp_port = 587
+    sender_email = os.getenv("ENV_EMAIL")  # Your email address
+    sender_password = os.getenv("ENV_PASSWORD")  # Your email password
+    
+    # Create the email message
+    message = MIMEMultipart()
+    message["From"] = sender_email
+    message["To"] = recipient_email
+    message["Subject"] = f"Refus de {company} pour l'offre {offre}"
+    
+    # Email body
+    email_body = f"""Cher / Chère {username},
+Nous tenons à vous remercier sincèrement pour l'intérêt que vous avez manifesté envers le poste de {offre} chez {company}. Après une évaluation approfondie de toutes les candidatures, nous regrettons de vous informer que votre candidature n'a pas été retenue pour ce poste.
+
+Nous avons apprécié vos compétences et votre expérience, mais le processus de sélection a été extrêmement compétitif.
+
+Nous vous souhaitons le meilleur dans vos recherches futures et espérons que nos chemins pourront se croiser à nouveau.
+
+Merci encore pour l'intérêt que vous avez porté à {company}.
+
+Cordialement,
+{company}"""
+    
+    message.attach(MIMEText(email_body, "plain"))
+    
+    # Connect to the SMTP server and send the email
+    try:
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+        server.login(sender_email, sender_password)
+        server.sendmail(sender_email, recipient_email, message.as_string())
+        server.quit()
+        return True
+    except Exception as e:
+        st.error(f"Error sending password reset email: {str(e)}")
+        return False
+
+    
+    
+    
 def is_token_expired( expiration_time):
     current_time = time.time()
     return current_time > expiration_time
@@ -66,8 +184,30 @@ def generate_confirmation_link( email):
     return confirmation_link, token
 
 def reset_password():
-    st.title("Reset Password")
-    reset_email = st.text_input("Enter your registered email address").lower()
+    st.markdown("""
+            <style>
+            div.stButton > button:first-child {
+                background-color: #FFD700;
+                color:#white;
+                font-weight: bold;
+            }
+            div.stButton > button:hover {
+                background-color: #FFA500;  /* Change color on hover, e.g., orange */
+                }
+            </style>""", unsafe_allow_html=True)
+    title_html = '''
+            <style>
+                .custom-title {
+                    color: #FFD700; /* Use the same color as the button */
+                    font-size: 44px; /* Adjust the font size as needed */
+                    font-weight: bold;
+                    margin-bottom: 20px; /* Add some margin to space it from other elements */
+                }
+            </style>
+            <h1 class="custom-title">Réinitialiser votre mot de passe !</h1>
+        '''
+    st.markdown(title_html, unsafe_allow_html=True)
+    reset_email = st.text_input("Entrez votre adresse e-mail de conenxion").lower()
     if st.button("Reset Password", key="reset_password_button"):
         user_data = fetch_user_data_mail(reset_email)
         if user_data:
@@ -81,12 +221,9 @@ def reset_password():
 
 def get_user_email_from_token(token):
     conn = sqlite3.connect('recruitment.db')
-    print(conn)
     cursor = conn.cursor()
-    print(cursor)
     cursor.execute("SELECT email_address FROM Users WHERE reset_token = ?", (token,))
     user = cursor.fetchone()
-    print(user)
     if user:
         return user[0]
     return None

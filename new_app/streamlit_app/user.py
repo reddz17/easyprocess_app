@@ -81,7 +81,6 @@ def fetch_user_data(user_id):
     user_data = cursor.fetchone()
     if user_data is None:
         # Handle the case when the user is not found
-        print(f"User with ID {user_id} not found.")
         return None  # You can return a default value or raise an exception if needed
     return user_data
 
@@ -127,14 +126,19 @@ def get_cv_path(user_id):
     cursor = conn.cursor()
     try:
         cursor.execute(
-            'SELECT cv_path FROM Users WHERE user_id = ?',(user_id,))
+            'SELECT cv_path FROM Users WHERE user_id = ?', (user_id,))
         cv_path = cursor.fetchone()
+        if cv_path is None:
+            # Handle the case when the user is not found
+            return None
     except sqlite3.Error as e:
         conn.rollback()
         print(f"Error updating CV path: {e}")
     finally:
         conn.close()
-    return cv_path[0]
+    # Check if cv_path is not None before subscripting
+    return cv_path[0] if cv_path is not None else None
+
 
 def check_email_exists(new_email):
     # Connect to the SQLite database (replace with your database connection logic)
@@ -155,19 +159,24 @@ def get_uploaded_candidate_files(u_id):
     # Assuming you have a table in your database that stores candidate files
     cursor.execute(
         'SELECT profile_picture, cv_path FROM Users WHERE user_id = ?', (u_id,))
-    user_files = cursor.fetchone()
-    profile_picture_path = user_files[0]
-    cv_path = user_files[1]
+    try:
+        user_files = cursor.fetchone()
+        profile_picture_path = user_files[0]
+        cv_path = user_files[1]
+    except sqlite3.Error as e:
+        conn.rollback()
+        print(f"Error apply data: {e}")
+    finally:
+        conn.close()
     return profile_picture_path, cv_path
-
-
+    
 
 def applied_offer(user_id):
     conn = sqlite3.connect('recruitment.db')  # Modify the database path if needed
     cursor = conn.cursor()
     # Construisez la requête SQL en fonction du terme de recherche
     cursor.execute("""SELECT a.job_id,a.job_title, a.cv_path,a.application_status,
-                   j.company, j.description 
+                   j.company, j.description, j.publication_date
                    FROM Applications a, JobOffers j 
                    WHERE candidate_id = ? and a.job_id = j.job_id""", (user_id,))
     # Exécutez la requête SQL pour récupérer les offres d'emploi
