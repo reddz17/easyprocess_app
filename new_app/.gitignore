@@ -1,0 +1,5 @@
+/static/data
+/new_app/static
+recruitment.db
+streamlit_app/env.py
+/__pycache__
